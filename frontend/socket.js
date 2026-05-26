@@ -16,7 +16,7 @@ let typingTimeout = null;
  * Initializes the Socket connection to the signaling server.
  */
 // Deployed Render signaling backend URL (Change to your actual Render URL after deployment!)
-const PROD_BACKEND_URL = "https://touchbygodmeet.onrender.com";
+const PROD_BACKEND_URL = "https://touchbygodmeetserver.onrender.com";
 
 function initSocket(onConnectedCallback) {
   // Check if we have a custom backend URL saved, otherwise deduce it
