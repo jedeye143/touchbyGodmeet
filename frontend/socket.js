@@ -297,6 +297,7 @@ function setupSocketEvents() {
 
   // Host ended meeting for everyone
   socket.on('room-ended-by-host', () => {
+    if (isLocalHost) return;
     alert('The host has ended this meeting for everyone.');
     window.location.href = 'index.html?reason=ended';
   });

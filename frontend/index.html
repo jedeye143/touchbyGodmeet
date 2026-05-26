@@ -11,6 +11,14 @@
     tailwind.config = {
       darkMode: 'class',
       theme: {
+        screens: {
+          'xs': '400px',
+          'sm': '640px',
+          'md': '768px',
+          'lg': '1024px',
+          'xl': '1280px',
+          '2xl': '1536px',
+        },
         extend: {
           colors: {
             brand: {
@@ -31,7 +39,7 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-[#070a13] text-slate-100 h-screen flex flex-col relative overflow-hidden">
+<body class="bg-[#070a13] text-slate-100 min-h-screen flex flex-col relative overflow-y-auto lg:overflow-hidden">
   <!-- Background gradient mesh -->
   <div class="mesh-bg"></div>
 
@@ -57,7 +65,7 @@
 
   <!-- Main Container (Full Page stretched layout) -->
   <main class="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8 z-10 overflow-y-auto lg:overflow-hidden">
-    <div class="w-full max-w-7xl h-full flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch justify-center">
+    <div class="w-full max-w-7xl h-auto lg:h-full flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch justify-center">
       
       <!-- Left Column: Video Setup & Hardware Preview (Takes 55% width on large screen, stretches full height) -->
       <div class="w-full lg:w-[55%] flex flex-col h-auto lg:h-full justify-between glass rounded-2xl p-5 border-slate-800 space-y-4 shrink-0">

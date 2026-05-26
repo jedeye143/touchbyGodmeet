@@ -10,6 +10,14 @@
     tailwind.config = {
       darkMode: 'class',
       theme: {
+        screens: {
+          'xs': '400px',
+          'sm': '640px',
+          'md': '768px',
+          'lg': '1024px',
+          'xl': '1280px',
+          '2xl': '1536px',
+        },
         extend: {
           colors: {
             brand: {
@@ -243,7 +251,7 @@
   </div>
 
   <!-- Bottom Floating Control Center Dock -->
-  <footer class="h-20 shrink-0 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md px-6 flex items-center justify-between z-30 relative">
+  <footer class="h-20 shrink-0 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between z-30 relative">
     
     <!-- Left Controls: Room Info Trigger & Short link info -->
     <div class="hidden md:flex flex-col items-start justify-center">
@@ -255,35 +263,35 @@
     </div>
 
     <!-- Center Control Buttons -->
-    <div class="flex items-center space-x-2 sm:space-x-3.5 mx-auto">
+    <div class="flex items-center space-x-1 xs:space-x-1.5 sm:space-x-2.5 md:space-x-3.5 mx-auto">
       <!-- Mute Mic -->
-      <button id="btn-mic" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-emerald-500/5 relative">
-        <i data-lucide="mic" class="w-5 h-5" id="btn-mic-icon"></i>
+      <button id="btn-mic" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-emerald-500/5 relative">
+        <i data-lucide="mic" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5" id="btn-mic-icon"></i>
         <span class="kbd-tooltip">Mute Audio <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">M</kbd></span>
       </button>
 
       <!-- Toggle Video -->
-      <button id="btn-video" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-indigo-500/5 relative">
-        <i data-lucide="video" class="w-5 h-5" id="btn-video-icon"></i>
+      <button id="btn-video" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-indigo-500/5 relative">
+        <i data-lucide="video" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5" id="btn-video-icon"></i>
         <span class="kbd-tooltip">Toggle Video <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">V</kbd></span>
       </button>
 
       <!-- Screen Share -->
-      <button id="btn-screen" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95 relative">
-        <i data-lucide="monitor" class="w-5 h-5" id="btn-screen-icon"></i>
+      <button id="btn-screen" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95 relative hidden sm:flex">
+        <i data-lucide="monitor" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5" id="btn-screen-icon"></i>
         <span class="kbd-tooltip">Share Screen <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">S</kbd></span>
       </button>
 
       <!-- Raise Hand -->
-      <button id="btn-hand" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95 relative">
-        <i data-lucide="hand" class="w-5 h-5" id="btn-hand-icon"></i>
+      <button id="btn-hand" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95 relative">
+        <i data-lucide="hand" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5" id="btn-hand-icon"></i>
         <span class="kbd-tooltip">Raise Hand <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">H</kbd></span>
       </button>
 
       <!-- Reaction Menu Trigger -->
       <div class="relative">
-        <button id="btn-reaction" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95">
-          <i data-lucide="smile" class="w-5 h-5"></i>
+        <button id="btn-reaction" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95">
+          <i data-lucide="smile" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5"></i>
           <span class="kbd-tooltip">Send Reaction</span>
         </button>
 
@@ -299,20 +307,20 @@
       </div>
 
       <!-- Settings Device Cog -->
-      <button id="btn-settings" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95">
-        <i data-lucide="settings" class="w-5 h-5"></i>
+      <button id="btn-settings" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95">
+        <i data-lucide="settings" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5"></i>
         <span class="kbd-tooltip">Settings</span>
       </button>
 
       <!-- Layout Toggle (Grid vs Spotlight) -->
-      <button id="btn-layout" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95" title="Change Layout">
-        <i data-lucide="layout-grid" class="w-5 h-5" id="btn-layout-icon"></i>
+      <button id="btn-layout" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95" title="Change Layout">
+        <i data-lucide="layout-grid" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5" id="btn-layout-icon"></i>
         <span class="kbd-tooltip">Change Layout</span>
       </button>
 
       <!-- Disconnect Red button -->
-      <button id="btn-leave" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-red-600 border border-red-500 text-white hover:bg-red-500 flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-red-500/10">
-        <i data-lucide="phone-off" class="w-5 h-5"></i>
+      <button id="btn-leave" class="control-btn w-9 h-9 xs:w-10 xs:h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl bg-red-600 border border-red-500 text-white hover:bg-red-500 flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-red-500/10">
+        <i data-lucide="phone-off" class="w-4 h-4 xs:w-4.5 xs:h-4.5 sm:w-5 sm:h-5"></i>
         <span class="kbd-tooltip">Leave Meeting</span>
       </button>
     </div>

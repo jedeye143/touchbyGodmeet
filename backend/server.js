@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const cors = require('cors');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,15 +19,22 @@ const io = socketIo(server, {
 app.use(cors());
 // Serve static files from frontend folder if running locally
 const frontendPath = path.join(__dirname, '../frontend');
-app.use(express.static(frontendPath));
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+  
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
-
-app.get('/meeting', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'meeting.html'));
-});
+  app.get('/meeting', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'meeting.html'));
+  });
+} else {
+  // Deployed API server (Render)
+  app.get('/', (req, res) => {
+    res.send('Touch by God Signaling Server is running smoothly! 🚀');
+  });
+}
 
 // Room states: roomId -> { id, hostId, isLocked, participants: Map(socketId -> data), pendingApproval: Map(socketId -> data) }
 const rooms = new Map();

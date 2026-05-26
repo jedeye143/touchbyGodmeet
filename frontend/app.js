@@ -803,11 +803,14 @@ function handleLeaveCall() {
       const endForAll = confirm("Do you want to end this meeting for all participants?");
       if (endForAll && socket) {
         socket.emit('host-end-room');
+        stopLocalMedia();
+        socket.disconnect();
+        window.location.href = 'index.html?reason=ended';
         return;
       }
     }
     
-    // Disconnect and redirect
+    // Disconnect and redirect for normal participant
     stopLocalMedia();
     if (socket) {
       socket.disconnect();
