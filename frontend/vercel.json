@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "name": "aethermeet",
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "source": "/",
+      "dest": "/index.html"
+    },
+    {
+      "source": "/meeting",
+      "dest": "/meeting.html"
+    },
+    {
+      "source": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}

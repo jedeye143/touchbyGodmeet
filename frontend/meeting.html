@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Touch by God Room - Divine Real-Time Call</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              900: '#4c1d95',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#070a13] text-slate-100 h-screen flex flex-col overflow-hidden relative">
+  <!-- Float Emojis Layer -->
+  <div id="emoji-container" class="absolute inset-0 pointer-events-none z-40 overflow-hidden"></div>
+
+  <!-- Sound Effects -->
+  <audio id="sound-join" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-84.wav" preload="auto"></audio>
+  <audio id="sound-leave" src="https://assets.mixkit.co/active_storage/sfx/2020/2020-84.wav" preload="auto"></audio>
+
+  <!-- Top Navigation/Info Bar -->
+  <header class="h-16 border-b border-slate-900 bg-slate-950/60 backdrop-blur-md px-6 flex items-center justify-between z-30 shrink-0">
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg">
+          <i data-lucide="sparkles" class="text-white w-4.5 h-4.5 animate-pulse"></i>
+        </div>
+        <span class="text-base font-black tracking-wider bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent hidden sm:inline-block uppercase">Touch by God</span>
+      </div>
+      <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+      
+      <!-- Meeting Timer & Details -->
+      <div class="flex items-center space-x-3">
+        <span id="meeting-id-display" class="text-xs font-semibold text-slate-400 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1">Room ID: ---</span>
+        <div class="flex items-center space-x-1.5 text-xs text-brand-400 font-medium">
+          <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+          <span id="meeting-timer">00:00:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Speaker & Quality Status -->
+    <div class="flex items-center space-x-4">
+      <!-- Quality Indicator -->
+      <div class="flex items-center space-x-2 text-xs bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-full">
+        <i data-lucide="signal" class="w-3.5 h-3.5 text-emerald-400" id="network-icon"></i>
+        <span class="text-slate-400 font-medium hidden md:inline">Latency:</span>
+        <span id="network-latency" class="text-emerald-400 font-bold">-- ms</span>
+      </div>
+
+      <!-- Participant Counter -->
+      <div class="flex items-center space-x-1.5 text-xs bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-full">
+        <i data-lucide="users" class="w-3.5 h-3.5 text-indigo-400"></i>
+        <span class="font-bold text-indigo-300" id="participant-count-badge">1</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Area (Grid + Side Panel) -->
+  <div class="flex-grow flex relative overflow-hidden z-10 w-full">
+    
+    <!-- Left Section: Video Grid Area -->
+    <div class="flex-grow flex flex-col p-4 space-y-4 overflow-hidden relative" id="grid-container">
+      
+      <!-- Video Grid -->
+      <div id="video-grid" class="flex-grow grid grid-cols-1 gap-4 items-center justify-center content-center transition-all duration-300">
+        <!-- Local User Video Card (Always exists) -->
+        <div id="local-video-card" class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full h-full shadow-lg group max-w-full max-h-full transition-all duration-300">
+          <!-- Video element -->
+          <video id="local-video" class="w-full h-full object-cover transform scale-x-[-1]" autoplay playsinline muted></video>
+          
+          <!-- Local Canvas for background blur -->
+          <canvas id="local-blur-canvas" class="absolute inset-0 w-full h-full object-cover transform scale-x-[-1] z-10 hidden"></canvas>
+
+          <!-- Muted Overlay -->
+          <div id="local-cam-muted" class="local-cam-muted absolute inset-0 bg-slate-900 flex flex-col items-center justify-center z-20 hidden">
+            <div class="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 mb-2">
+              <i data-lucide="user" class="w-8 h-8"></i>
+            </div>
+            <p class="text-xs text-slate-400 font-semibold" id="local-muted-nickname">You (Camera Muted)</p>
+          </div>
+
+          <!-- Pinned Indicator overlay -->
+          <button onclick="event.stopPropagation(); unpinParticipantVideo();" id="pin-indicator-local" class="absolute top-3 left-3 z-30 w-7 h-7 rounded-lg bg-slate-950/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-center text-brand-400 hover:text-white hover:bg-brand-600 transition-all hidden" title="Unpin Video">
+            <i data-lucide="pin-off" class="w-3.5 h-3.5"></i>
+          </button>
+
+          <!-- Hand Raised overlay indicator -->
+          <div id="hand-status-local" class="absolute top-3 right-12 z-30 w-7 h-7 rounded-lg bg-amber-500/90 border border-amber-400/80 backdrop-blur-md flex items-center justify-center text-slate-950 hidden">
+            <i data-lucide="hand" class="w-3.5 h-3.5"></i>
+          </div>
+
+          <!-- Bottom bar indicator inside Video -->
+          <div class="absolute bottom-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none">
+            <!-- Tag Name -->
+            <div class="bg-slate-950/80 border border-slate-800/80 backdrop-blur-md rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200 flex items-center space-x-1.5 pointer-events-auto">
+              <span id="local-name-tag">You</span>
+              <span id="local-host-badge" class="bg-brand-500/20 border border-brand-500/30 text-brand-400 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider hidden">Host</span>
+            </div>
+            
+            <!-- Indicators Icons -->
+            <div class="flex items-center space-x-1.5 pointer-events-auto">
+              <!-- Mic Status -->
+              <div id="local-mic-status" class="w-7 h-7 rounded-lg bg-slate-950/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-center text-slate-200">
+                <i data-lucide="mic" class="w-3.5 h-3.5 text-emerald-400"></i>
+              </div>
+              
+              <!-- Screen sharing -->
+              <div id="local-screen-status" class="w-7 h-7 rounded-lg bg-slate-950/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-center text-indigo-400 hidden">
+                <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Remote User Video Cards will be inserted here -->
+      </div>
+
+      <!-- Invite Panel Trigger / Quick Room Setup Banner (polishing empty/first joiner state) -->
+      <div id="invite-box" class="absolute bottom-6 left-6 z-30 glass max-w-sm p-4 rounded-xl space-y-3 shadow-xl transition-all duration-300 border-brand-500/20">
+        <div class="flex items-center justify-between">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Share Meeting Invitation</h4>
+          <button onclick="document.getElementById('invite-box').classList.add('hidden')" class="text-slate-500 hover:text-slate-300">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-500">Copy and send this link to colleagues you want in the call.</p>
+        <div class="flex items-center space-x-2 bg-slate-950/60 border border-slate-900 rounded-lg p-1.5">
+          <input type="text" id="invite-link-input" readonly value="https://touchbygod.vercel.app/meeting?room=xyz" 
+            class="bg-transparent text-xs text-slate-300 select-all outline-none flex-grow pl-1 text-ellipsis overflow-hidden">
+          <button id="copy-invite-btn" class="p-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-md text-xs flex items-center space-x-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Copy</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Section: Collapsible Sidebar (Chat + Participants) -->
+    <aside id="sidebar" class="w-80 border-l border-slate-900 bg-slate-950/60 backdrop-blur-md flex flex-col shrink-0 transition-all duration-300 translate-x-full absolute right-0 top-0 bottom-0 h-full lg:relative lg:translate-x-0 z-35 shadow-2xl">
+      <!-- Sidebar Header / Tabs -->
+      <div class="h-14 border-b border-slate-900 flex items-center justify-between px-4">
+        <div class="flex space-x-2 w-full">
+          <button id="tab-chat-btn" class="flex-grow py-2 text-xs font-semibold rounded-lg bg-slate-900 border border-slate-800 text-white transition-all flex items-center justify-center space-x-1.5">
+            <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+            <span>Chat</span>
+            <span id="chat-badge" class="bg-brand-500 text-white w-2 h-2 rounded-full hidden"></span>
+          </button>
+          <button id="tab-participants-btn" class="flex-grow py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1.5">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i>
+            <span>Participants</span>
+          </button>
+        </div>
+        <button id="close-sidebar-btn" class="lg:hidden text-slate-500 hover:text-slate-300 ml-2">
+          <i data-lucide="chevron-right" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Tab Contents Container -->
+      <div class="flex-grow overflow-hidden flex flex-col">
+        
+        <!-- Chat Content Tab -->
+        <div id="tab-chat" class="flex-grow flex flex-col h-full overflow-hidden">
+          <!-- Messages -->
+          <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
+            <!-- System Welcome Message -->
+            <div class="bg-slate-900/40 border border-slate-900/60 rounded-xl p-3 text-center space-y-1">
+              <i data-lucide="shield-check" class="w-5 h-5 text-brand-400 mx-auto"></i>
+              <h5 class="text-xs font-bold text-slate-200">Room Safety Confirmed</h5>
+              <p class="text-[10px] text-slate-500">Messages are end-to-end between local connections. Content is sanitized.</p>
+            </div>
+          </div>
+
+          <!-- Typing Indicator -->
+          <div id="typing-indicator" class="px-4 py-1.5 text-[10px] text-slate-500 flex items-center space-x-1.5 opacity-0 transition-opacity duration-200">
+            <span id="typing-text">Someone is typing</span>
+            <div class="flex items-center space-x-0.5">
+              <div class="typing-dot w-1 h-1 rounded-full"></div>
+              <div class="typing-dot w-1 h-1 rounded-full"></div>
+              <div class="typing-dot w-1 h-1 rounded-full"></div>
+            </div>
+          </div>
+
+          <!-- Message Input area -->
+          <div class="p-3 border-t border-slate-900 bg-slate-950/80">
+            <form id="chat-form" class="flex items-center space-x-2">
+              <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off"
+                class="flex-grow bg-slate-900/50 border border-slate-800 focus:border-brand-500 outline-none rounded-xl px-3.5 py-2.5 text-xs text-slate-200 transition-colors placeholder-slate-600">
+              <button type="submit" class="w-9 h-9 shrink-0 bg-brand-600 hover:bg-brand-500 text-white rounded-xl flex items-center justify-center transition-colors">
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Participants Content Tab -->
+        <div id="tab-participants" class="flex-grow flex flex-col h-full overflow-hidden hidden">
+          <!-- Room Security Lock Toggle (Visible only to host, disabled for participants) -->
+          <div class="p-3 border-b border-slate-900 bg-slate-900/20">
+            <div class="flex items-center justify-between bg-slate-950/60 border border-slate-900 rounded-xl p-3">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="lock" class="w-4 h-4 text-brand-400" id="lock-icon-sidebar"></i>
+                <div class="text-left">
+                  <span class="text-xs font-semibold block text-slate-200">Lock Meeting</span>
+                  <span class="text-[9px] text-slate-500 block">Blocks new participants</span>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="lock-room-toggle" class="sr-only peer" disabled>
+                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600 peer-checked:after:bg-white peer-checked:after:border-white"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Participants List -->
+          <div id="participants-list" class="flex-grow overflow-y-auto p-3 space-y-2">
+            <!-- Dynamic elements go here -->
+          </div>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+
+  <!-- Bottom Floating Control Center Dock -->
+  <footer class="h-20 shrink-0 border-t border-slate-900 bg-slate-950/80 backdrop-blur-md px-6 flex items-center justify-between z-30 relative">
+    
+    <!-- Left Controls: Room Info Trigger & Short link info -->
+    <div class="hidden md:flex flex-col items-start justify-center">
+      <span class="text-xs font-bold text-slate-200" id="room-display-name">Touch by God Conference</span>
+      <button onclick="document.getElementById('invite-box').classList.toggle('hidden')" class="text-[10px] text-brand-400 hover:text-brand-300 font-semibold flex items-center space-x-1 mt-0.5">
+        <i data-lucide="link" class="w-3 h-3"></i>
+        <span>Show Invitation details</span>
+      </button>
+    </div>
+
+    <!-- Center Control Buttons -->
+    <div class="flex items-center space-x-2 sm:space-x-3.5 mx-auto">
+      <!-- Mute Mic -->
+      <button id="btn-mic" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-emerald-500/5 relative">
+        <i data-lucide="mic" class="w-5 h-5" id="btn-mic-icon"></i>
+        <span class="kbd-tooltip">Mute Audio <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">M</kbd></span>
+      </button>
+
+      <!-- Toggle Video -->
+      <button id="btn-video" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-indigo-500/5 relative">
+        <i data-lucide="video" class="w-5 h-5" id="btn-video-icon"></i>
+        <span class="kbd-tooltip">Toggle Video <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">V</kbd></span>
+      </button>
+
+      <!-- Screen Share -->
+      <button id="btn-screen" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95 relative">
+        <i data-lucide="monitor" class="w-5 h-5" id="btn-screen-icon"></i>
+        <span class="kbd-tooltip">Share Screen <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">S</kbd></span>
+      </button>
+
+      <!-- Raise Hand -->
+      <button id="btn-hand" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95 relative">
+        <i data-lucide="hand" class="w-5 h-5" id="btn-hand-icon"></i>
+        <span class="kbd-tooltip">Raise Hand <kbd class="bg-slate-800 text-[10px] px-1 ml-1 rounded">H</kbd></span>
+      </button>
+
+      <!-- Reaction Menu Trigger -->
+      <div class="relative">
+        <button id="btn-reaction" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95">
+          <i data-lucide="smile" class="w-5 h-5"></i>
+          <span class="kbd-tooltip">Send Reaction</span>
+        </button>
+
+        <!-- Emojis reaction sub-bar overlay -->
+        <div id="reaction-sub-bar" class="reaction-bar absolute bottom-16 left-1/2 bg-slate-950/90 border border-slate-800 px-3 py-2 rounded-xl flex items-center space-x-2 shadow-2xl z-40">
+          <button class="reaction-emoji-btn hover:scale-130 transition-transform text-lg" data-emoji="👍">👍</button>
+          <button class="reaction-emoji-btn hover:scale-130 transition-transform text-lg" data-emoji="👏">👏</button>
+          <button class="reaction-emoji-btn hover:scale-130 transition-transform text-lg" data-emoji="❤️">❤️</button>
+          <button class="reaction-emoji-btn hover:scale-130 transition-transform text-lg" data-emoji="😂">😂</button>
+          <button class="reaction-emoji-btn hover:scale-130 transition-transform text-lg" data-emoji="🎉">🎉</button>
+          <button class="reaction-emoji-btn hover:scale-130 transition-transform text-lg" data-emoji="😮">😮</button>
+        </div>
+      </div>
+
+      <!-- Settings Device Cog -->
+      <button id="btn-settings" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95">
+        <i data-lucide="settings" class="w-5 h-5"></i>
+        <span class="kbd-tooltip">Settings</span>
+      </button>
+
+      <!-- Layout Toggle (Grid vs Spotlight) -->
+      <button id="btn-layout" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-all duration-200 transform active:scale-95" title="Change Layout">
+        <i data-lucide="layout-grid" class="w-5 h-5" id="btn-layout-icon"></i>
+        <span class="kbd-tooltip">Change Layout</span>
+      </button>
+
+      <!-- Disconnect Red button -->
+      <button id="btn-leave" class="control-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-red-600 border border-red-500 text-white hover:bg-red-500 flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md shadow-red-500/10">
+        <i data-lucide="phone-off" class="w-5 h-5"></i>
+        <span class="kbd-tooltip">Leave Meeting</span>
+      </button>
+    </div>
+
+    <!-- Right Controls: Toggle Panels -->
+    <div class="flex items-center space-x-2">
+      <!-- Toggle Chat Panel (mobile/desktop responsive layout) -->
+      <button id="btn-toggle-chat" class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center relative transition-colors">
+        <i data-lucide="message-square" class="w-4.5 h-4.5"></i>
+        <!-- Notification Dot -->
+        <span id="chat-notification-dot" class="absolute top-1 right-1 w-2.5 h-2.5 bg-brand-500 border-2 border-slate-950 rounded-full hidden"></span>
+      </button>
+
+      <!-- Toggle Participants list -->
+      <button id="btn-toggle-participants" class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 flex items-center justify-center transition-colors">
+        <i data-lucide="users" class="w-4.5 h-4.5"></i>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Modals Layer -->
+  
+  <!-- Reconnect Alert Panel (Initially Hidden) -->
+  <div id="reconnect-panel" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 glass px-4 py-2.5 rounded-full border-amber-500/20 text-slate-200 text-xs flex items-center space-x-2.5 shadow-2xl opacity-0 translate-y-2 pointer-events-none transition-all duration-300">
+    <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+    <span class="font-semibold text-amber-400">Connection disrupted. Attempting reconnection...</span>
+  </div>
+
+  <!-- Global Notify Toast -->
+  <div id="meeting-toast" class="fixed bottom-24 left-6 z-50 glass px-4 py-3 rounded-xl border-indigo-500/20 text-slate-200 text-xs flex items-center space-x-2 shadow-2xl opacity-0 translate-y-2 pointer-events-none transition-all duration-300">
+    <div class="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+      <i data-lucide="bell" class="w-4 h-4" id="meeting-toast-icon"></i>
+    </div>
+    <span id="meeting-toast-message">User joined the room</span>
+  </div>
+
+  <!-- Settings Device change Modal (during live call) -->
+  <div id="settings-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="glass max-w-lg w-full mx-4 rounded-2xl p-6 border-slate-800 space-y-5 shadow-2xl text-left">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold tracking-wider uppercase text-slate-200 flex items-center space-x-2">
+          <i data-lucide="sliders" class="w-4 h-4 text-brand-500"></i>
+          <span>Meeting Devices Settings</span>
+        </h3>
+        <button id="close-settings-btn" class="text-slate-500 hover:text-slate-300 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Select Devices grid -->
+      <div class="space-y-4">
+        <!-- Camera select -->
+        <div class="space-y-1.5">
+          <label for="call-camera-select" class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Video Camera Source</label>
+          <select id="call-camera-select" class="device-select w-full bg-slate-900 border border-slate-800/80 focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-xs text-slate-300 outline-none transition-colors">
+            <!-- populated dynamically -->
+          </select>
+        </div>
+
+        <!-- Mic select -->
+        <div class="space-y-1.5">
+          <label for="call-mic-select" class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Microphone Input Source</label>
+          <select id="call-mic-select" class="device-select w-full bg-slate-900 border border-slate-800/80 focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-xs text-slate-300 outline-none transition-colors">
+            <!-- populated dynamically -->
+          </select>
+        </div>
+
+        <!-- Speaker select -->
+        <div class="space-y-1.5">
+          <label for="call-speaker-select" class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Speaker Output</label>
+          <select id="call-speaker-select" class="device-select w-full bg-slate-900 border border-slate-800/80 focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-xs text-slate-300 outline-none transition-colors">
+            <!-- populated dynamically -->
+          </select>
+        </div>
+
+        <div class="h-px bg-slate-900"></div>
+
+        <!-- Blur background live toggle -->
+        <div>
+          <label class="flex items-center space-x-3 cursor-pointer select-none">
+            <input type="checkbox" id="call-blur-bg-toggle" class="w-4.5 h-4.5 rounded border-slate-800 bg-slate-950/60 text-brand-500 focus:ring-brand-500 focus:ring-offset-slate-900 cursor-pointer">
+            <span class="text-xs text-slate-200 font-semibold flex items-center space-x-1.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Blur My Background (Canvas Filter)</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 pt-2">
+        <button id="save-settings-btn" class="flex-grow py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl text-xs transition-colors">
+          Apply & Save Configuration
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Host Notification Dialog for incoming knocks (Waiting Room) -->
+  <div id="approval-modal" class="fixed inset-x-0 top-6 mx-auto max-w-sm z-50 glass p-4 rounded-2xl border-brand-500/30 text-left space-y-3 shadow-2xl opacity-0 -translate-y-4 pointer-events-none transition-all duration-300">
+    <div class="flex items-start justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center">
+          <i data-lucide="user-plus" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold text-white">Knock! Someone wants to join</h4>
+          <p class="text-[10px] text-slate-500"><span id="approval-nickname" class="text-brand-400 font-semibold">User</span> is waiting to enter.</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="flex space-x-2.5 pt-1">
+      <button id="approval-reject-btn" class="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-semibold rounded-lg text-[10px] transition-colors">
+        Decline
+      </button>
+      <button id="approval-accept-btn" class="flex-1 py-1.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-lg text-[10px] transition-colors">
+        Admit Participant
+      </button>
+    </div>
+  </div>
+
+  <!-- Remote Unmute Permission Request (For Host) -->
+  <div id="unmute-request-modal" class="fixed inset-x-0 top-6 mx-auto max-w-sm z-50 glass p-4 rounded-2xl border-emerald-500/30 text-left space-y-3 shadow-2xl opacity-0 -translate-y-4 pointer-events-none transition-all duration-300">
+    <div class="flex items-start justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center animate-pulse">
+          <i data-lucide="mic" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold text-white">Unmute Permission Request</h4>
+          <p class="text-[10px] text-slate-500"><span id="unmute-request-nickname" class="text-emerald-400 font-semibold">User</span> is requesting to unmute their mic.</p>
+        </div>
+      </div>
+    </div>
+    <div class="flex space-x-2.5 pt-1">
+      <button id="unmute-request-deny-btn" class="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 font-semibold rounded-lg text-[10px] transition-colors">
+        Ignore
+      </button>
+      <button id="unmute-request-allow-btn" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-[10px] transition-colors">
+        Allow Unmute
+      </button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <!-- Socket.io -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- App JS components -->
+  <script src="socket.js"></script>
+  <script src="webrtc.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

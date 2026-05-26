@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Touch by God - Premium Video Meetings</title>
+  <meta name="description" content="Host secure, real-time video meetings with advanced media tools, host controls, and high-fidelity WebRTC connections.">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              500: '#8b5cf6', /* Purple */
+              600: '#7c3aed',
+              700: '#6d28d9',
+              900: '#4c1d95',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#070a13] text-slate-100 h-screen flex flex-col relative overflow-hidden">
+  <!-- Background gradient mesh -->
+  <div class="mesh-bg"></div>
+
+  <!-- Header -->
+  <header class="w-full max-w-7xl mx-auto px-6 pt-4 pb-2 flex items-center justify-between z-10 shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
+        <i data-lucide="sparkles" class="text-white w-5.5 h-5.5 animate-pulse"></i>
+      </div>
+      <div>
+        <span class="text-xl font-black tracking-wider bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent uppercase">Touch by God</span>
+        <span class="text-[10px] block text-violet-500 font-bold uppercase tracking-widest -mt-1">Divine WebRTC Rooms</span>
+      </div>
+    </div>
+    
+    <div class="flex items-center space-x-4">
+      <div class="hidden sm:flex items-center space-x-2 text-[10px] text-slate-400 bg-slate-900/60 border border-slate-800 rounded-full px-3 py-1.5 backdrop-blur-md">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        <span class="font-bold text-emerald-400 uppercase tracking-wider">Signaling Status: Active</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container (Full Page stretched layout) -->
+  <main class="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8 z-10 overflow-y-auto lg:overflow-hidden">
+    <div class="w-full max-w-7xl h-full flex flex-col lg:flex-row gap-6 lg:gap-8 items-stretch justify-center">
+      
+      <!-- Left Column: Video Setup & Hardware Preview (Takes 55% width on large screen, stretches full height) -->
+      <div class="w-full lg:w-[55%] flex flex-col h-auto lg:h-full justify-between glass rounded-2xl p-5 border-slate-800 space-y-4 shrink-0">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <h3 class="text-xs font-bold tracking-widest uppercase text-violet-400 flex items-center space-x-2">
+            <i data-lucide="settings" class="w-4 h-4"></i>
+            <span>Hardware & Camera Calibration</span>
+          </h3>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 font-bold uppercase">Ready</span>
+        </div>
+
+        <!-- Live Feed Box (Fills remaining height) -->
+        <div class="relative flex-grow aspect-video lg:aspect-auto rounded-xl bg-slate-950 overflow-hidden border border-slate-800 group shadow-2xl flex items-center justify-center min-h-[220px]">
+          <!-- Loader State -->
+          <div id="preview-loader" class="absolute inset-0 flex flex-col items-center justify-center space-y-3 z-20 bg-slate-950/90 transition-opacity duration-300">
+            <div class="w-10 h-10 border-4 border-slate-800 border-t-brand-500 rounded-full animate-spin"></div>
+            <span class="text-xs text-slate-500 font-medium">Requesting hardware permissions...</span>
+          </div>
+
+          <!-- Camera Muted Overlay -->
+          <div id="camera-muted-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 z-10 hidden">
+            <div class="w-16 h-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 mb-2 shadow-inner">
+              <i data-lucide="video-off" class="w-8 h-8"></i>
+            </div>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Webcam deactivated</p>
+            <p class="text-[10px] text-slate-600 font-medium">Audio stream remains active</p>
+          </div>
+
+          <!-- Video element -->
+          <video id="preview-video" autoplay playsinline muted class="w-full h-full object-cover relative z-0"></video>
+          
+          <!-- Canvas Overlay for Background Blur filter -->
+          <canvas id="blur-canvas" class="hidden"></canvas>
+
+          <!-- Bottom Left overlay: Audio Level Indicator -->
+          <div class="absolute bottom-4 left-4 z-10 flex items-center space-x-2 bg-slate-950/80 border border-slate-800/80 rounded-full px-3 py-1.5 backdrop-blur-md">
+            <div class="flex items-end space-x-0.5 h-3.5" id="mic-bars-container">
+              <div class="mic-wave-bar h-1"></div>
+              <div class="mic-wave-bar h-1"></div>
+              <div class="mic-wave-bar h-1"></div>
+              <div class="mic-wave-bar h-1"></div>
+              <div class="mic-wave-bar h-1"></div>
+            </div>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" id="mic-status-label">Mic Active</span>
+          </div>
+
+          <!-- Control toggles over video -->
+          <div class="absolute bottom-4 right-4 z-10 flex items-center space-x-2.5">
+            <button id="toggle-mic-btn" class="w-10 h-10 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 flex items-center justify-center text-emerald-400 transition-colors shadow-lg">
+              <i data-lucide="mic" class="w-5 h-5" id="mic-icon"></i>
+            </button>
+            <button id="toggle-video-btn" class="w-10 h-10 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 flex items-center justify-center text-brand-400 transition-colors shadow-lg">
+              <i data-lucide="video" class="w-5 h-5" id="video-icon"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Select Devices Options -->
+        <div class="space-y-3 pt-1 shrink-0">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div class="space-y-1">
+              <label for="camera-select" class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Video Input Source</label>
+              <select id="camera-select" class="device-select w-full bg-slate-950/40 border border-slate-800/80 focus:border-brand-500 rounded-xl px-3 py-2.5 text-xs text-slate-300 outline-none transition-colors">
+                <option value="" disabled selected>Retrieving camera...</option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <label for="mic-select" class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Audio Input Source</label>
+              <select id="mic-select" class="device-select w-full bg-slate-950/40 border border-slate-800/80 focus:border-brand-500 rounded-xl px-3 py-2.5 text-xs text-slate-300 outline-none transition-colors">
+                <option value="" disabled selected>Retrieving mic...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-center">
+            <div class="space-y-1">
+              <label for="speaker-select" class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Audio Output Destination</label>
+              <select id="speaker-select" class="device-select w-full bg-slate-950/40 border border-slate-800/80 focus:border-brand-500 rounded-xl px-3 py-2.5 text-xs text-slate-300 outline-none transition-colors">
+                <option value="" disabled selected>Retrieving speakers...</option>
+              </select>
+            </div>
+
+            <div class="pt-4 sm:pt-5">
+              <label class="flex items-center space-x-3 cursor-pointer select-none">
+                <input type="checkbox" id="blur-bg-toggle" class="w-4.5 h-4.5 rounded border-slate-800 bg-slate-950/60 text-brand-500 focus:ring-brand-500 focus:ring-offset-slate-900 cursor-pointer">
+                <span class="text-xs text-slate-300 font-bold flex items-center space-x-1.5 uppercase tracking-wider">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-violet-400"></i>
+                  <span>Vignette Background Blur</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Join Actions & Setup (Takes 45% width on large screen, centers vertically) -->
+      <div class="w-full lg:w-[45%] flex flex-col justify-center h-auto lg:h-full shrink-0">
+        <div class="glass p-6 sm:p-8 rounded-2xl border-slate-800 space-y-6 flex flex-col justify-between shadow-2xl relative overflow-hidden min-h-[460px]">
+          <!-- Top decorative line -->
+          <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-600 via-indigo-500 to-sky-400"></div>
+
+          <!-- App welcome branding -->
+          <div class="space-y-2.5 text-left">
+            <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-white leading-tight uppercase">
+              Divine meeting spaces.<br>
+              <span class="bg-gradient-to-r from-violet-400 via-indigo-300 to-sky-300 bg-clip-text text-transparent">Seamless calling.</span>
+            </h1>
+            <p class="text-slate-400 text-xs leading-relaxed max-w-sm">
+              Instantly calibrate your hardware, enter a nickname, and launch clean low-latency video meetings.
+            </p>
+          </div>
+
+          <!-- Nickname input block -->
+          <div class="space-y-2 text-left">
+            <label for="nickname" class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Identify Yourself</label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="user" class="w-4 h-4"></i>
+              </div>
+              <input type="text" id="nickname" name="nickname" placeholder="Enter nickname..."
+                class="w-full pl-10 pr-4 py-3.5 bg-slate-950/50 border border-slate-800/80 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none rounded-xl text-xs transition-all duration-200 placeholder-slate-650 font-medium"
+                maxlength="20" required>
+            </div>
+            
+            <div class="flex items-center justify-between pt-0.5">
+              <label class="flex items-center space-x-2.5 cursor-pointer select-none">
+                <input type="checkbox" id="remember-name" class="w-4.5 h-4.5 rounded border-slate-800 bg-slate-950/60 text-brand-500 focus:ring-brand-500 focus:ring-offset-slate-900 cursor-pointer">
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Remember name locally</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="h-px bg-slate-900 my-1"></div>
+
+          <!-- CTA Join buttons -->
+          <div class="space-y-4">
+            <!-- Create Button -->
+            <button id="create-btn" class="w-full py-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-extrabold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg shadow-brand-500/15 transition-all duration-300 transform active:scale-[0.98] hover:shadow-brand-500/25">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>Create New Meeting Room</span>
+            </button>
+
+            <!-- Divider -->
+            <div class="relative flex py-1 items-center">
+              <div class="flex-grow border-t border-slate-900"></div>
+              <span class="flex-shrink mx-4 text-[9px] font-bold uppercase text-slate-600 tracking-widest">Or join existing</span>
+              <div class="flex-grow border-t border-slate-900"></div>
+            </div>
+
+            <!-- Join Input Form -->
+            <div class="flex flex-col sm:flex-row gap-3">
+              <div class="relative flex-grow">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                  <i data-lucide="key" class="w-4 h-4"></i>
+                </div>
+                <input type="text" id="room-code" placeholder="Enter Meeting ID or Link"
+                  class="w-full pl-10 pr-4 py-3.5 bg-slate-950/50 border border-slate-800/80 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none rounded-xl text-xs transition-all duration-200 placeholder-slate-650 font-medium">
+              </div>
+              <button id="join-btn" class="px-7 py-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-extrabold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all duration-200 transform active:scale-[0.98] shrink-0">
+                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                <span>Join</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Modals & Toasts Layer -->
+  <!-- Toast alert (initially hidden) -->
+  <div id="toast" class="fixed bottom-6 left-6 z-50 glass px-4 py-3 rounded-xl border-red-500/20 text-slate-200 text-xs flex items-center space-x-2 shadow-2xl opacity-0 translate-y-2 pointer-events-none transition-all duration-300">
+    <div class="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center text-red-400">
+      <i data-lucide="alert-circle" class="w-4.5 h-4.5"></i>
+    </div>
+    <span id="toast-message">An error occurred.</span>
+  </div>
+
+  <!-- Waiting Knock Dialog Modal -->
+  <div id="knock-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="glass max-w-md w-full mx-4 rounded-2xl p-6 border-slate-800 text-center space-y-5 shadow-2xl">
+      <div class="w-16 h-16 bg-brand-500/10 border border-brand-500/20 text-brand-400 rounded-full flex items-center justify-center mx-auto animate-pulse">
+        <i data-lucide="door-closed" class="w-8 h-8"></i>
+      </div>
+      
+      <div class="space-y-2">
+        <h3 class="text-lg font-bold text-white uppercase tracking-wider">Knocking on the door...</h3>
+        <p class="text-xs text-slate-400 max-w-xs mx-auto">
+          We've requested the host <span id="host-name-placeholder" class="text-brand-400 font-bold"></span> to let you join. Please wait a moment.
+        </p>
+      </div>
+
+      <!-- Connecting Shimmer -->
+      <div class="relative w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+        <div class="absolute inset-0 bg-brand-500 w-1/3 rounded-full animate-[shimmer_1.5s_infinite] origin-left" style="animation-name: loading-bar;"></div>
+      </div>
+      
+      <style>
+        @keyframes loading-bar {
+          0% { left: -30%; width: 30%; }
+          50% { width: 50%; }
+          100% { left: 100%; width: 30%; }
+        }
+      </style>
+
+      <button id="cancel-knock-btn" class="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-350 font-bold rounded-xl text-xs uppercase tracking-wider transition-colors">
+        Cancel Knock Request
+      </button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="w-full py-4 border-t border-slate-900 bg-slate-950/40 text-center text-[10px] text-slate-600 z-10 shrink-0 font-bold uppercase tracking-widest">
+    <p>© 2026 Touch by God meetings. Secure WebRTC P2P conferencing. All rights reserved.</p>
+  </footer>
+
+  <!-- Scripts -->
+  <!-- Include Socket.io client -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- Load App files -->
+  <script src="socket.js"></script>
+  <script src="webrtc.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

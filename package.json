@@ -1,0 +1,20 @@
+{
+  "name": "aethermeet",
+  "version": "1.0.0",
+  "description": "Production-style video meeting web app inspired by Google Meet using WebRTC and Socket.io",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Antigravity AI",
+  "license": "MIT"
+}
