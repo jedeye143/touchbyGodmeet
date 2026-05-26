@@ -93,7 +93,12 @@ async function setupHardwareDevices() {
   const loader = document.getElementById('preview-loader');
   
   try {
-    // Initial permission request
+    // Check for saved device selections from localStorage
+    const storedCameraId = localStorage.getItem('aethermeet_selected_camera_id');
+    const storedMicId = localStorage.getItem('aethermeet_selected_mic_id');
+    const storedSpeakerId = localStorage.getItem('aethermeet_selected_speaker_id');
+
+    // Initial permission request with stored device constraints
     const stream = await getLocalMedia();
     
     // Bind stream to video element
@@ -122,15 +127,31 @@ async function setupHardwareDevices() {
 
       if (device.kind === 'videoinput') {
         option.textContent = device.label || `Camera ${camSelect.length + 1}`;
+        if (storedCameraId === device.deviceId) {
+          option.selected = true;
+        }
         if (camSelect) camSelect.appendChild(option);
       } else if (device.kind === 'audioinput') {
         option.textContent = device.label || `Microphone ${micSelect.length + 1}`;
+        if (storedMicId === device.deviceId) {
+          option.selected = true;
+        }
         if (micSelect) micSelect.appendChild(option);
       } else if (device.kind === 'audiooutput') {
         option.textContent = device.label || `Speaker ${speakerSelect.length + 1}`;
+        if (storedSpeakerId === device.deviceId) {
+          option.selected = true;
+        }
         if (speakerSelect) speakerSelect.appendChild(option);
       }
     });
+
+    // Apply initial speaker output selection if available
+    if (storedSpeakerId && previewVideo && typeof previewVideo.setSinkId === 'function') {
+      previewVideo.setSinkId(storedSpeakerId)
+        .then(() => console.log(`Audio output initially directed to: ${storedSpeakerId}`))
+        .catch(err => console.warn('Could not set initial speaker sink ID:', err));
+    }
 
     // Listen for device changes
     if (camSelect) {
@@ -141,6 +162,8 @@ async function setupHardwareDevices() {
     }
     if (speakerSelect) {
       speakerSelect.addEventListener('change', (e) => {
+        // Persist speaker selection
+        localStorage.setItem('aethermeet_selected_speaker_id', e.target.value);
         // Output device sink (requires Chrome/Edge, fallback otherwise)
         const videoEl = document.getElementById('preview-video');
         if (videoEl && typeof videoEl.setSinkId === 'function') {
@@ -969,6 +992,14 @@ function renderRemoteVideoTile(remoteSocketId, nickname, stream, isHost) {
   const remoteVideo = document.getElementById(`video-${remoteSocketId}`);
   if (remoteVideo) {
     remoteVideo.srcObject = stream;
+    
+    // Apply stored speaker output destination if supported
+    const storedSpeakerId = localStorage.getItem('aethermeet_selected_speaker_id');
+    if (storedSpeakerId && typeof remoteVideo.setSinkId === 'function') {
+      remoteVideo.setSinkId(storedSpeakerId)
+        .catch(err => console.warn(`Could not set speaker sink ID on remote video:`, err));
+    }
+
     // Autoplay policy fallback: explicitly invoke play
     remoteVideo.play().catch(err => {
       console.warn(`Autoplay blocked for peer: ${nickname}. Retrying on user interaction.`, err);
@@ -1497,6 +1528,10 @@ async function openSettingsModal() {
       micSelect.appendChild(option);
     } else if (device.kind === 'audiooutput') {
       option.textContent = device.label || `Speaker`;
+      const storedSpeakerId = localStorage.getItem('aethermeet_selected_speaker_id');
+      if (storedSpeakerId === device.deviceId) {
+        option.selected = true;
+      }
       speakerSelect.appendChild(option);
     }
   });
@@ -1510,6 +1545,7 @@ function closeSettingsModal() {
 async function applySettingsChanges() {
   const camSelect = document.getElementById('call-camera-select');
   const micSelect = document.getElementById('call-mic-select');
+  const speakerSelect = document.getElementById('call-speaker-select');
   const blurCheck = document.getElementById('call-blur-bg-toggle');
 
   // Check if camera source changed
@@ -1520,6 +1556,20 @@ async function applySettingsChanges() {
   // Check if mic source changed
   if (micSelect && micSelect.value && (!localAudioTrack || localAudioTrack.getSettings().deviceId !== micSelect.value)) {
     await changeDevice('audio', micSelect.value);
+  }
+
+  // Check if speaker source changed
+  if (speakerSelect && speakerSelect.value) {
+    localStorage.setItem('aethermeet_selected_speaker_id', speakerSelect.value);
+    
+    // Apply speaker selection to all audio/video elements on the page
+    const mediaElements = document.querySelectorAll('video, audio');
+    mediaElements.forEach(el => {
+      if (typeof el.setSinkId === 'function') {
+        el.setSinkId(speakerSelect.value)
+          .catch(err => console.warn('Could not set speaker sink ID on element:', err));
+      }
+    });
   }
 
   // Blur canvas toggle

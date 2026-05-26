@@ -43,12 +43,49 @@ let activeSpeakerTimer = null;
 /**
  * Request user permissions and retrieve audio/video streams.
  */
-async function getLocalMedia(constraints = { video: true, audio: true }) {
+async function getLocalMedia(constraints = null) {
   try {
     // If we have existing streams, stop them first
     stopLocalMedia();
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    let stream;
+    if (constraints) {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } else {
+      const storedCameraId = localStorage.getItem('aethermeet_selected_camera_id');
+      const storedMicId = localStorage.getItem('aethermeet_selected_mic_id');
+
+      const videoConstraints = storedCameraId ? { deviceId: { exact: storedCameraId } } : true;
+      const audioConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      };
+      if (storedMicId) {
+        audioConstraints.deviceId = { exact: storedMicId };
+      }
+
+      const customConstraints = {
+        video: videoConstraints,
+        audio: audioConstraints
+      };
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(customConstraints);
+      } catch (err) {
+        console.warn("Failed to get media with stored device IDs, falling back to default constraints...", err);
+        // Fallback to defaults with audio processing enabled
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+      }
+    }
+
     localStream = stream;
     localAudioTrack = stream.getAudioTracks()[0];
     localVideoTrack = stream.getVideoTracks()[0];
@@ -238,9 +275,20 @@ function toggleBackgroundBlur(enabled) {
 async function changeDevice(kind, deviceId) {
   if (!localStream) return;
 
+  // Persist the selection so it survives redirects/refreshes
+  if (kind === 'video') {
+    localStorage.setItem('aethermeet_selected_camera_id', deviceId);
+  } else if (kind === 'audio') {
+    localStorage.setItem('aethermeet_selected_mic_id', deviceId);
+  }
+
   const constraints = {
-    audio: kind === 'audio' ? { deviceId: { exact: deviceId } } : (localAudioTrack ? { deviceId: localAudioTrack.getSettings().deviceId } : true),
-    video: kind === 'video' ? { deviceId: { exact: deviceId } } : (localVideoTrack ? { deviceId: localVideoTrack.getSettings().deviceId } : true)
+    audio: kind === 'audio' 
+      ? { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+      : (localAudioTrack ? { deviceId: { exact: localAudioTrack.getSettings().deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true } : { echoCancellation: true, noiseSuppression: true, autoGainControl: true }),
+    video: kind === 'video' 
+      ? { deviceId: { exact: deviceId } } 
+      : (localVideoTrack ? { deviceId: { exact: localVideoTrack.getSettings().deviceId } } : true)
   };
 
   try {
