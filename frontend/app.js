@@ -796,12 +796,59 @@ function copyInviteMeetingLink() {
  * Exit Meeting Room.
  */
 function handleLeaveCall() {
-  const confirmation = confirm("Are you sure you want to leave this meeting?");
-  if (confirmation) {
-    // If local user is the host, ask if they want to end meeting for everyone
-    if (isLocalHost) {
-      const endForAll = confirm("Do you want to end this meeting for all participants?");
-      if (endForAll && socket) {
+  if (typeof Swal === 'undefined') {
+    // Fallback if SweetAlert2 is not loaded yet
+    const confirmation = confirm("Are you sure you want to leave this meeting?");
+    if (confirmation) {
+      if (isLocalHost) {
+        const endForAll = confirm("Do you want to end this meeting for all participants?");
+        if (endForAll && socket) {
+          let redirected = false;
+          const doRedirect = () => {
+            if (redirected) return;
+            redirected = true;
+            stopLocalMedia();
+            socket.disconnect();
+            window.location.href = 'index.html?reason=ended';
+          };
+          socket.emit('host-end-room', () => {
+            doRedirect();
+          });
+          setTimeout(doRedirect, 500);
+          return;
+        }
+      }
+      stopLocalMedia();
+      if (socket) socket.disconnect();
+      window.location.href = 'index.html';
+    }
+    return;
+  }
+
+  // Host SweetAlert2 Dialog
+  if (isLocalHost) {
+    Swal.fire({
+      title: 'Exit Meeting Options',
+      text: 'Since you are the host, would you like to end the meeting for everyone or just leave quietly?',
+      icon: 'warning',
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: 'End Meeting for All',
+      denyButtonText: 'Leave Quietly',
+      cancelButtonText: 'Cancel',
+      background: '#070a13',
+      color: '#f1f5f9',
+      confirmButtonColor: '#ef4444', // Red for ending call
+      denyButtonColor: '#7c3aed', // Purple brand color to leave quietly
+      cancelButtonColor: '#1e293b', // Slate-800
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'font-bold text-white tracking-wide',
+        htmlContainer: 'text-slate-400 text-xs mt-2'
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // End for everyone
         let redirected = false;
         const doRedirect = () => {
           if (redirected) return;
@@ -810,24 +857,42 @@ function handleLeaveCall() {
           socket.disconnect();
           window.location.href = 'index.html?reason=ended';
         };
-
-        // Emit 'host-end-room' and wait for acknowledgement
         socket.emit('host-end-room', () => {
           doRedirect();
         });
-
-        // Safety timeout fallback (500ms) to guarantee redirect even with network lag
         setTimeout(doRedirect, 500);
-        return;
+      } else if (result.isDenied) {
+        // Leave quietly
+        stopLocalMedia();
+        if (socket) socket.disconnect();
+        window.location.href = 'index.html';
       }
-    }
-    
-    // Disconnect and redirect for normal participant
-    stopLocalMedia();
-    if (socket) {
-      socket.disconnect();
-    }
-    window.location.href = 'index.html';
+    });
+  } else {
+    // Normal Participant SweetAlert2 Dialog
+    Swal.fire({
+      title: 'Leave Meeting?',
+      text: 'Are you sure you want to disconnect from this call?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Leave',
+      cancelButtonText: 'Cancel',
+      background: '#070a13',
+      color: '#f1f5f9',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#1e293b',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'font-bold text-white tracking-wide',
+        htmlContainer: 'text-slate-400 text-xs mt-2'
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        stopLocalMedia();
+        if (socket) socket.disconnect();
+        window.location.href = 'index.html';
+      }
+    });
   }
 }
 

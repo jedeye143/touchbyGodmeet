@@ -291,15 +291,53 @@ function setupSocketEvents() {
 
   // Host remote control: kicked us
   socket.on('host-kicked-you', () => {
-    alert('You have been removed from this meeting by the host.');
-    window.location.href = 'index.html?reason=kicked';
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: 'Removed from Meeting',
+        text: 'You have been removed from this meeting by the host.',
+        icon: 'error',
+        confirmButtonText: 'OK',
+        background: '#070a13',
+        color: '#f1f5f9',
+        confirmButtonColor: '#ef4444',
+        customClass: {
+          popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+          title: 'font-bold text-white',
+          htmlContainer: 'text-slate-400 text-xs'
+        }
+      }).then(() => {
+        window.location.href = 'index.html?reason=kicked';
+      });
+    } else {
+      alert('You have been removed from this meeting by the host.');
+      window.location.href = 'index.html?reason=kicked';
+    }
   });
 
   // Host ended meeting for everyone
   socket.on('room-ended-by-host', () => {
     if (isLocalHost) return;
-    alert('The host has ended this meeting for everyone.');
-    window.location.href = 'index.html?reason=ended';
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: 'Meeting Ended',
+        text: 'The host has ended this meeting for everyone.',
+        icon: 'info',
+        confirmButtonText: 'Back to Home',
+        background: '#070a13',
+        color: '#f1f5f9',
+        confirmButtonColor: '#7c3aed',
+        customClass: {
+          popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+          title: 'font-bold text-white',
+          htmlContainer: 'text-slate-400 text-xs'
+        }
+      }).then(() => {
+        window.location.href = 'index.html?reason=ended';
+      });
+    } else {
+      alert('The host has ended this meeting for everyone.');
+      window.location.href = 'index.html?reason=ended';
+    }
   });
 
   // Host only: join request received from a knocking participant
