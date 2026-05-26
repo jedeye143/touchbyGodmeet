@@ -111,7 +111,7 @@ function setupSocketEvents() {
     showNotificationToast(`${participantData.nickname} joined the meeting`);
     
     // Instantiate new Peer Connection (WebRTC)
-    createPeerConnection(participantData.socketId, participantData.nickname, true, participantData.isHost);
+    createPeerConnection(participantData.socketId, participantData.nickname, false, participantData.isHost);
     
     // Update participants list and badge
     updateParticipantsList();
@@ -468,16 +468,16 @@ function playNotificationSound(type) {
   const soundJoin = document.getElementById('sound-join');
   const soundLeave = document.getElementById('sound-leave');
   
-  try {
-    if (type === 'join' && soundJoin) {
-      soundJoin.currentTime = 0;
-      soundJoin.play();
-    } else if (type === 'leave' && soundLeave) {
-      soundLeave.currentTime = 0;
-      soundLeave.play();
-    }
-  } catch (err) {
-    console.log('Audio playback blocked by browser security policy until interaction.', err);
+  if (type === 'join' && soundJoin) {
+    soundJoin.currentTime = 0;
+    soundJoin.play().catch(err => {
+      console.warn('Audio playback blocked by browser security policy until interaction.', err);
+    });
+  } else if (type === 'leave' && soundLeave) {
+    soundLeave.currentTime = 0;
+    soundLeave.play().catch(err => {
+      console.warn('Audio playback blocked by browser security policy until interaction.', err);
+    });
   }
 }
 

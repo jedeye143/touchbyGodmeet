@@ -496,7 +496,8 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
     stream: null,
     remoteAudioMuted: false,
     remoteVideoMuted: false,
-    isHost
+    isHost,
+    iceCandidatesQueue: []
   });
 
   // Send local media tracks to peer
@@ -587,9 +588,27 @@ async function handleSignalingData(fromSocketId, signal) {
           signal: { sdp: pc.localDescription }
         });
       }
+
+      // Process queued candidates
+      if (peerRecord.iceCandidatesQueue && peerRecord.iceCandidatesQueue.length > 0) {
+        console.log(`Processing ${peerRecord.iceCandidatesQueue.length} queued ICE Candidates for: ${peerRecord.nickname}`);
+        for (const candidate of peerRecord.iceCandidatesQueue) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.warn("Error adding queued ICE Candidate:", e);
+          }
+        }
+        peerRecord.iceCandidatesQueue = [];
+      }
     } else if (signal.candidate) {
-      console.log(`Adding ICE Candidate from: ${peerRecord.nickname}`);
-      await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      if (pc.remoteDescription && pc.remoteDescription.type) {
+        console.log(`Adding ICE Candidate from: ${peerRecord.nickname}`);
+        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      } else {
+        console.log(`Queueing ICE Candidate from: ${peerRecord.nickname} (Remote description not set yet)`);
+        peerRecord.iceCandidatesQueue.push(signal.candidate);
+      }
     }
   } catch (err) {
     console.error(`Error processing WebRTC signaling data:`, err);
