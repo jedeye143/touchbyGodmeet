@@ -419,12 +419,21 @@ function initMeeting() {
   isVideoMuted = sessionStorage.getItem('aethermeet_video_muted') === 'true';
   isBlurActive = sessionStorage.getItem('aethermeet_blur_bg') === 'true';
 
+  // Setup history state for back-button minimize/leave hijacking
+  history.pushState({ inMeeting: true }, null, location.href);
+  window.addEventListener('popstate', handleBackButton);
+
   // Bind footer controls UI events
   document.getElementById('btn-mic').addEventListener('click', toggleCallMic);
   document.getElementById('btn-video').addEventListener('click', toggleCallVideo);
   document.getElementById('btn-screen').addEventListener('click', toggleScreenShareState);
   document.getElementById('btn-hand').addEventListener('click', toggleHandRaise);
   document.getElementById('btn-leave').addEventListener('click', handleLeaveCall);
+  
+  const btnPip = document.getElementById('btn-pip');
+  if (btnPip) {
+    btnPip.addEventListener('click', enterPictureInPicture);
+  }
   
   // Emoji triggers
   const reactionBtn = document.getElementById('btn-reaction');
@@ -1716,4 +1725,101 @@ function setupKeyboardShortcuts() {
       }
     }
   });
+}
+
+/**
+ * Request Chrome/Safari/Firefox Picture-in-Picture window on active video feed.
+ */
+function enterPictureInPicture() {
+  let videoEl = null;
+
+  // 1. Try to find the pinned video card's video element
+  const pinnedCard = document.querySelector('.video-card-pinned video');
+  if (pinnedCard) {
+    videoEl = pinnedCard;
+  } else {
+    // 2. Try to find the first remote video element
+    const remoteVideos = Array.from(document.querySelectorAll('video[id^="video-"]'));
+    if (remoteVideos.length > 0) {
+      videoEl = remoteVideos[0];
+    } else {
+      // 3. Fallback to local video
+      videoEl = document.getElementById('local-video');
+    }
+  }
+
+  if (videoEl) {
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture()
+        .then(() => console.log('Exited Picture-in-Picture.'))
+        .catch(err => console.error('Error exiting Picture-in-Picture:', err));
+    } else if (typeof videoEl.requestPictureInPicture === 'function') {
+      videoEl.requestPictureInPicture()
+        .then(() => console.log('Entered Picture-in-Picture successfully!'))
+        .catch(err => {
+          console.warn('Failed to enter Picture-in-Picture:', err);
+          showNotificationToast("Failed to minimize video. Make sure video stream is active.");
+        });
+    } else {
+      showNotificationToast("Your browser does not support Picture-in-Picture.");
+    }
+  } else {
+    showNotificationToast("No active video feed to minimize.");
+  }
+}
+
+/**
+ * Hijacks the browser back button state to prompt the user to minimize.
+ */
+function handleBackButton(event) {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: 'Leaving Meeting?',
+      text: 'Would you like to minimize this meeting to a floating window or leave the call entirely?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Minimize (Floating Window)',
+      cancelButtonText: 'Leave Call',
+      background: '#070a13',
+      color: '#f1f5f9',
+      confirmButtonColor: '#7c3aed',
+      cancelButtonColor: '#ef4444',
+      customClass: {
+        popup: 'border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-md',
+        title: 'font-bold text-white',
+        htmlContainer: 'text-slate-400 text-xs'
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // User clicked "Minimize" - trigger Picture-in-Picture!
+        enterPictureInPicture();
+        // Push state back so next back button click prompts again
+        history.pushState({ inMeeting: true }, null, location.href);
+      } else {
+        // User clicked "Leave" or clicked outside
+        leaveCallDirectly();
+      }
+    });
+  } else {
+    const minimize = confirm("Would you like to minimize this meeting to a floating window? Click Cancel to leave the call.");
+    if (minimize) {
+      enterPictureInPicture();
+      history.pushState({ inMeeting: true }, null, location.href);
+    } else {
+      leaveCallDirectly();
+    }
+  }
+}
+
+/**
+ * Clean up connection and exit without double-confirming for participants.
+ */
+function leaveCallDirectly() {
+  if (isLocalHost) {
+    handleLeaveCall();
+  } else {
+    stopLocalMedia();
+    if (socket) socket.disconnect();
+    window.location.href = 'index.html';
+  }
 }
