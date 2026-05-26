@@ -341,7 +341,7 @@ io.on('connection', (socket) => {
   });
 
   // Host Controls: End room for everyone
-  socket.on('host-end-room', () => {
+  socket.on('host-end-room', (callback) => {
     const roomId = socket.roomId;
     if (!roomId) return;
     const room = rooms.get(roomId);
@@ -349,6 +349,10 @@ io.on('connection', (socket) => {
 
     io.to(roomId).emit('room-ended-by-host');
     rooms.delete(roomId);
+
+    if (typeof callback === 'function') {
+      callback();
+    }
   });
 
   // Request unmute (participant requests host for permission)

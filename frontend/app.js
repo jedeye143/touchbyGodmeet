@@ -802,10 +802,22 @@ function handleLeaveCall() {
     if (isLocalHost) {
       const endForAll = confirm("Do you want to end this meeting for all participants?");
       if (endForAll && socket) {
-        socket.emit('host-end-room');
-        stopLocalMedia();
-        socket.disconnect();
-        window.location.href = 'index.html?reason=ended';
+        let redirected = false;
+        const doRedirect = () => {
+          if (redirected) return;
+          redirected = true;
+          stopLocalMedia();
+          socket.disconnect();
+          window.location.href = 'index.html?reason=ended';
+        };
+
+        // Emit 'host-end-room' and wait for acknowledgement
+        socket.emit('host-end-room', () => {
+          doRedirect();
+        });
+
+        // Safety timeout fallback (500ms) to guarantee redirect even with network lag
+        setTimeout(doRedirect, 500);
         return;
       }
     }
