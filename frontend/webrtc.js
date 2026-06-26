@@ -55,7 +55,20 @@ async function getLocalMedia(constraints = null) {
       const storedCameraId = localStorage.getItem('aethermeet_selected_camera_id');
       const storedMicId = localStorage.getItem('aethermeet_selected_mic_id');
 
-      const videoConstraints = storedCameraId ? { deviceId: { exact: storedCameraId } } : true;
+      // Optimized video constraints to reduce CPU/GPU usage and heat
+      const videoConstraints = storedCameraId 
+        ? { 
+            deviceId: { exact: storedCameraId },
+            width: { ideal: 1280, max: 1280 },
+            height: { ideal: 720, max: 720 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        : {
+            width: { ideal: 1280, max: 1280 },
+            height: { ideal: 720, max: 720 },
+            frameRate: { ideal: 30, max: 30 }
+          };
+          
       const audioConstraints = {
         echoCancellation: { ideal: true, exact: true },
         noiseSuppression: { ideal: true },
@@ -78,7 +91,11 @@ async function getLocalMedia(constraints = null) {
         console.warn("Failed to get media with stored device IDs, falling back to default constraints...", err);
         // Fallback to defaults with audio processing enabled
         stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: {
+            width: { ideal: 1280, max: 1280 },
+            height: { ideal: 720, max: 720 },
+            frameRate: { ideal: 30, max: 30 }
+          },
           audio: {
             echoCancellation: { ideal: true, exact: true },
             noiseSuppression: { ideal: true },
@@ -151,20 +168,26 @@ function setupBlurCanvas() {
   
   if (!blurCanvasElement || !blurSourceVideo || !localVideoTrack) return;
 
-  blurCanvasCtx = blurCanvasElement.getContext('2d');
+  blurCanvasCtx = blurCanvasElement.getContext('2d', { 
+    alpha: false,
+    desynchronized: true // Better performance
+  });
   blurCanvasElement.classList.remove('hidden');
 
-  // Set canvas resolution matching the video track settings
+  // Set canvas resolution - reduced for better performance
+  // Use lower resolution to reduce GPU/CPU load
   const settings = localVideoTrack.getSettings();
-  blurCanvasElement.width = settings.width || 640;
-  blurCanvasElement.height = settings.height || 480;
+  const targetWidth = Math.min(settings.width || 640, 960); // Max 960px width
+  const targetHeight = Math.min(settings.height || 480, 540); // Max 540px height
+  blurCanvasElement.width = targetWidth;
+  blurCanvasElement.height = targetHeight;
 
   // Start processing loop
   isBlurActive = true;
   processBlurFrame();
 
-  // Capture canvas stream at 30fps
-  const canvasStream = blurCanvasElement.captureStream(30);
+  // Capture canvas stream at 24fps (reduced from 30fps for better performance)
+  const canvasStream = blurCanvasElement.captureStream(24);
   
   // Replace the processedLocalStream video track
   processedLocalStream = new MediaStream([
@@ -175,8 +198,12 @@ function setupBlurCanvas() {
 
 /**
  * Processing frame loop for camera Bokeh/vignette blur.
+ * Optimized to reduce CPU usage and heat generation.
  */
-function processBlurFrame() {
+let lastBlurFrameTime = 0;
+const blurFrameInterval = 1000 / 30; // 30fps instead of 60fps
+
+function processBlurFrame(currentTime) {
   if (!isBlurActive || !blurCanvasCtx || !blurSourceVideo || blurSourceVideo.paused || blurSourceVideo.ended) {
     if (isBlurActive) {
       blurCanvasLoopId = requestAnimationFrame(processBlurFrame);
@@ -184,14 +211,21 @@ function processBlurFrame() {
     return;
   }
 
+  // Throttle to 30fps to reduce CPU usage
+  if (currentTime - lastBlurFrameTime < blurFrameInterval) {
+    blurCanvasLoopId = requestAnimationFrame(processBlurFrame);
+    return;
+  }
+  lastBlurFrameTime = currentTime;
+
   const w = blurCanvasElement.width;
   const h = blurCanvasElement.height;
 
   // Clear canvas
   blurCanvasCtx.clearRect(0, 0, w, h);
 
-  // 1. Draw background: blurred video
-  blurCanvasCtx.filter = 'blur(16px)';
+  // 1. Draw background: blurred video (reduced blur for performance)
+  blurCanvasCtx.filter = 'blur(12px)'; // Reduced from 16px
   blurCanvasCtx.drawImage(blurSourceVideo, 0, 0, w, h);
   blurCanvasCtx.filter = 'none';
 
@@ -480,13 +514,24 @@ function setupAudioAnalysis() {
 
 /**
  * Loop running volume frequency checks.
+ * Optimized to reduce CPU usage by throttling to 20fps.
  */
-function analyzeLocalAudioVolume() {
+let lastAudioAnalysisTime = 0;
+const audioAnalysisInterval = 1000 / 20; // 20fps instead of 60fps
+
+function analyzeLocalAudioVolume(currentTime) {
   if (!localAnalyser || isAudioMuted) {
     resetMicLevelUI();
     localAudioLevelLoopId = requestAnimationFrame(analyzeLocalAudioVolume);
     return;
   }
+
+  // Throttle to 20fps to reduce CPU usage
+  if (currentTime - lastAudioAnalysisTime < audioAnalysisInterval) {
+    localAudioLevelLoopId = requestAnimationFrame(analyzeLocalAudioVolume);
+    return;
+  }
+  lastAudioAnalysisTime = currentTime;
 
   const dataArray = new Uint8Array(localAnalyser.frequencyBinCount);
   localAnalyser.getByteFrequencyData(dataArray);
@@ -694,6 +739,7 @@ function destroyPeerConnection(socketId) {
 
 /**
  * Audio analysis for speaking detection of remote users.
+ * Optimized to reduce CPU usage with throttling.
  */
 function setupRemoteAudioAnalysis(remoteSocketId, remoteStream) {
   try {
@@ -701,16 +747,26 @@ function setupRemoteAudioAnalysis(remoteSocketId, remoteStream) {
     if (!peerRecord || !audioContext) return;
 
     const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 64;
+    analyser.fftSize = 64; // Keep small for performance
 
     const source = audioContext.createMediaStreamSource(remoteStream);
     source.connect(analyser);
 
     peerRecord.analyser = analyser;
     
+    let lastRemoteAnalysisTime = 0;
+    const remoteAnalysisInterval = 1000 / 15; // 15fps for remote audio
+    
     // Start analysis loop for this peer
-    const loop = () => {
+    const loop = (currentTime) => {
       if (!peers.has(remoteSocketId)) return; // Peer was removed
+
+      // Throttle remote audio analysis
+      if (currentTime - lastRemoteAnalysisTime < remoteAnalysisInterval) {
+        peerRecord.analyserLoopId = requestAnimationFrame(loop);
+        return;
+      }
+      lastRemoteAnalysisTime = currentTime;
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       analyser.getByteFrequencyData(dataArray);

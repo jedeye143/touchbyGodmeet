@@ -1177,8 +1177,20 @@ function renderRemoteVideoTile(remoteSocketId, nickname, stream, isHost) {
 
 /**
  * Custom math layout logic to size grids nicely according to aspect ratio and tile counts.
+ * Optimized with debouncing to reduce excessive calls.
  */
+let reorganizeGridTimeout = null;
+
 function reorganizeGrid() {
+  // Debounce to prevent excessive calls
+  if (reorganizeGridTimeout) {
+    clearTimeout(reorganizeGridTimeout);
+  }
+  
+  reorganizeGridTimeout = setTimeout(_reorganizeGridInternal, 50);
+}
+
+function _reorganizeGridInternal() {
   const grid = document.getElementById('video-grid');
   if (!grid) return;
 
