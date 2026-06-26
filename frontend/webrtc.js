@@ -5,22 +5,36 @@ const iceConfiguration = {
     // Google STUN servers
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
     
-    // Free public TURN servers (Numb)
+    // Twilio STUN (free)
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    
+    // Free public TURN servers (Numb) - most reliable
     {
-      urls: ['turn:numb.viagenie.ca'],
+      urls: 'turn:numb.viagenie.ca',
       username: 'webrtc@live.com',
       credential: 'muazkh'
     },
     
-    // Free TURN servers (Metered with multiple transports)
+    // Metered TURN servers with all transport types
     {
-      urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:80?transport=tcp',
-        'turn:openrelay.metered.ca:443',
-        'turns:openrelay.metered.ca:443?transport=tcp'
-      ],
+      urls: 'turn:a.relay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:a.relay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turns:a.relay.metered.ca:443?transport=tcp',
       username: 'openrelayproject',
       credential: 'openrelayproject'
     }
@@ -629,38 +643,73 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
     });
   }
 
-  // Ice candidates gathering callback
+  // Ice candidates gathering callback with detailed logging
   pc.onicecandidate = (event) => {
     if (event.candidate && socket) {
-      const candidateType = event.candidate.type || 'unknown';
-      const candidateProtocol = event.candidate.protocol || 'unknown';
-      console.log(`Sending ICE candidate to ${nickname}: type=${candidateType}, protocol=${candidateProtocol}, address=${event.candidate.address || 'N/A'}`);
+      const cand = event.candidate;
+      const candidateType = cand.type || 'unknown';
+      const candidateProtocol = cand.protocol || 'unknown';
+      const candidateAddress = cand.address || cand.ip || 'N/A';
+      const candidatePort = cand.port || 'N/A';
+      
+      // Log with color coding based on type
+      if (candidateType === 'relay') {
+        console.log(`📤 RELAY candidate to ${nickname}: ${candidateProtocol}, ${candidateAddress}:${candidatePort}`);
+      } else if (candidateType === 'srflx') {
+        console.log(`📤 SRFLX candidate to ${nickname}: ${candidateProtocol}, ${candidateAddress}:${candidatePort}`);
+      } else if (candidateType === 'host') {
+        console.log(`📤 HOST candidate to ${nickname}: ${candidateProtocol}, ${candidateAddress}:${candidatePort}`);
+      } else {
+        console.log(`📤 ${candidateType} candidate to ${nickname}: ${candidateProtocol}, ${candidateAddress}:${candidatePort}`);
+      }
+      
       socket.emit('signal', {
         to: remoteSocketId,
         signal: { candidate: event.candidate }
       });
     } else if (!event.candidate) {
-      console.log(`ICE gathering complete for ${nickname}`);
+      console.log(`🏁 ICE gathering complete for ${nickname}`);
     }
   };
 
   // ICE connection state monitoring with improved recovery
+  let iceRestartAttempts = 0;
+  const MAX_ICE_RESTART_ATTEMPTS = 3;
+  
   pc.oniceconnectionstatechange = () => {
     const state = pc.iceConnectionState;
     console.log(`ICE connection state for ${nickname}: ${state}`);
     
-    if (state === 'failed' || state === 'disconnected') {
-      console.warn(`ICE connection ${state} for ${nickname} - attempting recovery`);
-      
-      // Try ICE restart after a delay
-      setTimeout(() => {
-        if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
-          console.log(`Attempting ICE restart for ${nickname}`);
-          pc.restartIce();
-        }
-      }, 2000);
+    if (state === 'checking') {
+      console.log(`🔍 ICE checking candidates for ${nickname}...`);
     } else if (state === 'connected' || state === 'completed') {
       console.log(`✅ ICE connection successful with ${nickname}`);
+      iceRestartAttempts = 0; // Reset counter on success
+    } else if (state === 'failed') {
+      console.error(`❌ ICE connection FAILED for ${nickname}`);
+      
+      if (iceRestartAttempts < MAX_ICE_RESTART_ATTEMPTS) {
+        iceRestartAttempts++;
+        console.log(`🔄 Attempting ICE restart ${iceRestartAttempts}/${MAX_ICE_RESTART_ATTEMPTS} for ${nickname}`);
+        
+        setTimeout(() => {
+          if (pc.iceConnectionState === 'failed') {
+            pc.restartIce();
+          }
+        }, 2000);
+      } else {
+        console.error(`❌ Max ICE restart attempts reached for ${nickname}`);
+      }
+    } else if (state === 'disconnected') {
+      console.warn(`⚠️ ICE connection ${state} for ${nickname} - waiting for recovery`);
+      
+      // Try to recover from disconnect
+      setTimeout(() => {
+        if (pc.iceConnectionState === 'disconnected') {
+          console.log(`Attempting recovery for ${nickname}`);
+          pc.restartIce();
+        }
+      }, 3000);
     }
   };
 
