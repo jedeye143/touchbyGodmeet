@@ -123,7 +123,8 @@ function setupSocketEvents() {
     showNotificationToast(`${participantData.nickname} joined the meeting`);
     
     // Instantiate new Peer Connection (WebRTC)
-    createPeerConnection(participantData.socketId, participantData.nickname, false, participantData.isHost);
+    // WE are the existing user, so WE initiate the connection (isInitiator=TRUE)
+    createPeerConnection(participantData.socketId, participantData.nickname, true, participantData.isHost);
     
     // Update participants list and badge
     updateParticipantsList();

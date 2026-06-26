@@ -57,9 +57,11 @@ async function getLocalMedia(constraints = null) {
 
       const videoConstraints = storedCameraId ? { deviceId: { exact: storedCameraId } } : true;
       const audioConstraints = {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
+        echoCancellation: { ideal: true, exact: true },
+        noiseSuppression: { ideal: true },
+        autoGainControl: { ideal: true },
+        sampleRate: 48000,
+        sampleSize: 16
       };
       if (storedMicId) {
         audioConstraints.deviceId = { exact: storedMicId };
@@ -78,9 +80,11 @@ async function getLocalMedia(constraints = null) {
         stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
+            echoCancellation: { ideal: true, exact: true },
+            noiseSuppression: { ideal: true },
+            autoGainControl: { ideal: true },
+            sampleRate: 48000,
+            sampleSize: 16
           }
         });
       }

@@ -689,6 +689,13 @@ function initMeeting() {
       const roomMode = urlParams.get('mode') || 'meeting';
       socket.emit('join-room', { roomId, nickname, roomType: roomMode });
 
+      // Show echo prevention tip if mic is unmuted
+      if (!isAudioMuted) {
+        setTimeout(() => {
+          showNotificationToast("💡 Tip: Use headphones to prevent echo/feedback");
+        }, 2000);
+      }
+
       // Start meeting clock
       startMeetingTimer();
 
