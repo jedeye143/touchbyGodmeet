@@ -717,21 +717,26 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
     }
   };
 
-  // If we are initiating, create and send WebRTC SDP offer
+  // If we are initiating, create and send WebRTC SDP offer immediately
   if (isInitiator) {
-    pc.onnegotiationneeded = async () => {
+    // Create offer immediately after peer connection is set up
+    // Don't rely on onnegotiationneeded as it can cause glare (both sides offering)
+    (async () => {
       try {
-        console.log(`Negotiation needed for peer: ${nickname}`);
+        console.log(`🚀 Creating and sending offer to ${nickname} (we are initiator)`);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        console.log(`📤 Sending offer to ${nickname}`);
         socket.emit('signal', {
           to: remoteSocketId,
           signal: { sdp: pc.localDescription }
         });
       } catch (err) {
-        console.error('Error creating offer during negotiation:', err);
+        console.error(`Error creating initial offer for ${nickname}:`, err);
       }
-    };
+    })();
+  } else {
+    console.log(`⏳ Waiting for offer from ${nickname} (they are initiator)`);
   }
 }
 
@@ -740,52 +745,81 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
  */
 async function handleSignalingData(fromSocketId, signal) {
   const peerRecord = peers.get(fromSocketId);
-  if (!peerRecord) return;
+  if (!peerRecord) {
+    console.warn(`⚠️ Received signal from unknown peer: ${fromSocketId}`);
+    return;
+  }
 
   const pc = peerRecord.pc;
+  const signalingState = pc.signalingState;
 
   try {
     if (signal.sdp) {
-      console.log(`Setting remote description (SDP) from: ${peerRecord.nickname}`);
-      await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      const sdpType = signal.sdp.type;
+      console.log(`📥 Received ${sdpType} from ${peerRecord.nickname} (our state: ${signalingState})`);
       
-      // If we received an offer, we must answer it
-      if (signal.sdp.type === 'offer') {
+      // Handle offer
+      if (sdpType === 'offer') {
+        // If we're in a bad state, rollback first
+        if (signalingState !== 'stable' && signalingState !== 'have-remote-offer') {
+          console.warn(`⚠️ Received offer in state ${signalingState}, attempting rollback`);
+          try {
+            await pc.setLocalDescription({ type: 'rollback' });
+          } catch (e) {
+            console.warn('Rollback failed:', e);
+          }
+        }
+        
+        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        console.log(`✅ Set remote description (offer) from ${peerRecord.nickname}`);
+        
+        // Create and send answer
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        console.log(`📤 Sending answer to ${peerRecord.nickname}`);
         socket.emit('signal', {
           to: fromSocketId,
           signal: { sdp: pc.localDescription }
         });
+      } 
+      // Handle answer
+      else if (sdpType === 'answer') {
+        if (signalingState === 'have-local-offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          console.log(`✅ Set remote description (answer) from ${peerRecord.nickname}`);
+        } else {
+          console.warn(`⚠️ Received answer in unexpected state: ${signalingState}`);
+        }
       }
 
-      // Process queued candidates
+      // Process queued ICE candidates after SDP is set
       if (peerRecord.iceCandidatesQueue && peerRecord.iceCandidatesQueue.length > 0) {
-        console.log(`Processing ${peerRecord.iceCandidatesQueue.length} queued ICE Candidates for: ${peerRecord.nickname}`);
+        console.log(`📦 Processing ${peerRecord.iceCandidatesQueue.length} queued ICE candidates for ${peerRecord.nickname}`);
         for (const candidate of peerRecord.iceCandidatesQueue) {
           try {
             await pc.addIceCandidate(new RTCIceCandidate(candidate));
           } catch (e) {
-            console.warn("Error adding queued ICE Candidate:", e);
+            console.warn("Error adding queued ICE candidate:", e);
           }
         }
         peerRecord.iceCandidatesQueue = [];
       }
-    } else if (signal.candidate) {
-      // Accept all candidate types for better connectivity
+    } 
+    // Handle ICE candidate
+    else if (signal.candidate) {
       const candidateType = signal.candidate.type || 'unknown';
       const candidateProtocol = signal.candidate.protocol || 'unknown';
       
       if (pc.remoteDescription && pc.remoteDescription.type) {
-        console.log(`Adding ICE Candidate from ${peerRecord.nickname}: type=${candidateType}, protocol=${candidateProtocol}`);
+        console.log(`📥 Adding ICE candidate from ${peerRecord.nickname}: type=${candidateType}, protocol=${candidateProtocol}`);
         try {
           await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-          console.log(`✅ ICE candidate added successfully from ${peerRecord.nickname}`);
+          console.log(`✅ ICE candidate added successfully`);
         } catch (e) {
-          console.error(`❌ Failed to add ICE candidate from ${peerRecord.nickname}:`, e);
+          console.error(`❌ Failed to add ICE candidate:`, e);
         }
       } else {
-        console.log(`📦 Queueing ICE Candidate from ${peerRecord.nickname} (Remote description not set yet, type=${candidateType})`);
+        console.log(`📦 Queueing ICE candidate from ${peerRecord.nickname} (no remote description yet, type=${candidateType})`);
         if (!peerRecord.iceCandidatesQueue) {
           peerRecord.iceCandidatesQueue = [];
         }
@@ -793,7 +827,7 @@ async function handleSignalingData(fromSocketId, signal) {
       }
     }
   } catch (err) {
-    console.error(`Error processing WebRTC signaling data:`, err);
+    console.error(`❌ Error processing signaling from ${peerRecord.nickname}:`, err);
   }
 }
 
