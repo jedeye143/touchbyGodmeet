@@ -782,10 +782,10 @@ function handleRoomJoined(existingParticipants) {
   
   // Set up peer connections
   existingParticipants.forEach(participant => {
-    // WE are the NEW joiner, so we do NOT initiate (isInitiator=FALSE)
-    // Existing participants will receive 'user-connected' and initiate to us
-    console.log(`Creating peer connection to existing participant: ${participant.nickname} (they will initiate)`);
-    createPeerConnection(participant.socketId, participant.nickname, false, participant.isHost);
+    // New joiner initiates to existing participants
+    // This is the standard WebRTC pattern
+    console.log(`Creating peer connection to existing participant: ${participant.nickname} (we initiate)`);
+    createPeerConnection(participant.socketId, participant.nickname, true, participant.isHost);
   });
 
   updateParticipantsList();

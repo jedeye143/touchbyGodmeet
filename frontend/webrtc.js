@@ -5,19 +5,28 @@ const iceConfiguration = {
     // Google STUN servers
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
     
-    // Twilio STUN (free)
+    // Twilio STUN
     { urls: 'stun:global.stun.twilio.com:3478' },
     
-    // Free public TURN servers (Numb) - most reliable
+    // STUNner public TURN server (alternative free option)
     {
-      urls: 'turn:numb.viagenie.ca',
-      username: 'webrtc@live.com',
-      credential: 'muazkh'
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject', 
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
     },
     
-    // Metered TURN servers with all transport types
+    // Alternative: a.relay instead of openrelay
     {
       urls: 'turn:a.relay.metered.ca:80',
       username: 'openrelayproject',
@@ -37,10 +46,17 @@ const iceConfiguration = {
       urls: 'turns:a.relay.metered.ca:443?transport=tcp',
       username: 'openrelayproject',
       credential: 'openrelayproject'
+    },
+    
+    // Numb TURN
+    {
+      urls: 'turn:numb.viagenie.ca',
+      username: 'webrtc@live.com',
+      credential: 'muazkh'
     }
   ],
   iceCandidatePoolSize: 10,
-  iceTransportPolicy: 'all', // Try all candidates (relay and direct)
+  iceTransportPolicy: 'all',
   bundlePolicy: 'max-bundle',
   rtcpMuxPolicy: 'require'
 };
@@ -644,6 +660,9 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
   }
 
   // Ice candidates gathering callback with detailed logging
+  let hasRelayCandidates = false;
+  let candidateGatheringTimer = null;
+  
   pc.onicecandidate = (event) => {
     if (event.candidate && socket) {
       const cand = event.candidate;
@@ -651,6 +670,11 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
       const candidateProtocol = cand.protocol || 'unknown';
       const candidateAddress = cand.address || cand.ip || 'N/A';
       const candidatePort = cand.port || 'N/A';
+      
+      // Track if we found relay candidates
+      if (candidateType === 'relay') {
+        hasRelayCandidates = true;
+      }
       
       // Log with color coding based on type
       if (candidateType === 'relay') {
@@ -669,6 +693,12 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
       });
     } else if (!event.candidate) {
       console.log(`🏁 ICE gathering complete for ${nickname}`);
+      
+      // Warn if no RELAY candidates were found
+      if (!hasRelayCandidates) {
+        console.warn(`⚠️ WARNING: No RELAY candidates found for ${nickname}. Cross-network connection may fail!`);
+        console.warn(`💡 TIP: You may need to configure your own TURN server for production use.`);
+      }
     }
   };
 
@@ -766,12 +796,18 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
     }
   };
 
-  // If we are initiating, create and send WebRTC SDP offer immediately
+  // If we are initiating, create and send WebRTC SDP offer
   if (isInitiator) {
-    // Create offer immediately after peer connection is set up
-    // Don't rely on onnegotiationneeded as it can cause glare (both sides offering)
-    (async () => {
+    // Use negotiationneeded event to create offer
+    // This ensures tracks are added before creating offer
+    pc.onnegotiationneeded = async () => {
       try {
+        // Avoid glare by checking signaling state
+        if (pc.signalingState !== 'stable') {
+          console.log(`Skipping negotiation for ${nickname} - not in stable state`);
+          return;
+        }
+        
         console.log(`🚀 Creating and sending offer to ${nickname} (we are initiator)`);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -781,9 +817,9 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
           signal: { sdp: pc.localDescription }
         });
       } catch (err) {
-        console.error(`Error creating initial offer for ${nickname}:`, err);
+        console.error(`Error creating offer for ${nickname}:`, err);
       }
-    })();
+    };
   } else {
     console.log(`⏳ Waiting for offer from ${nickname} (they are initiator)`);
   }
@@ -800,29 +836,17 @@ async function handleSignalingData(fromSocketId, signal) {
   }
 
   const pc = peerRecord.pc;
-  const signalingState = pc.signalingState;
 
   try {
     if (signal.sdp) {
       const sdpType = signal.sdp.type;
-      console.log(`📥 Received ${sdpType} from ${peerRecord.nickname} (our state: ${signalingState})`);
+      console.log(`📥 Received ${sdpType} from ${peerRecord.nickname}`);
       
-      // Handle offer
+      await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      console.log(`✅ Set remote description (${sdpType}) from ${peerRecord.nickname}`);
+      
+      // If we received an offer, we must answer it
       if (sdpType === 'offer') {
-        // If we're in a bad state, rollback first
-        if (signalingState !== 'stable' && signalingState !== 'have-remote-offer') {
-          console.warn(`⚠️ Received offer in state ${signalingState}, attempting rollback`);
-          try {
-            await pc.setLocalDescription({ type: 'rollback' });
-          } catch (e) {
-            console.warn('Rollback failed:', e);
-          }
-        }
-        
-        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        console.log(`✅ Set remote description (offer) from ${peerRecord.nickname}`);
-        
-        // Create and send answer
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         console.log(`📤 Sending answer to ${peerRecord.nickname}`);
@@ -830,15 +854,6 @@ async function handleSignalingData(fromSocketId, signal) {
           to: fromSocketId,
           signal: { sdp: pc.localDescription }
         });
-      } 
-      // Handle answer
-      else if (sdpType === 'answer') {
-        if (signalingState === 'have-local-offer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          console.log(`✅ Set remote description (answer) from ${peerRecord.nickname}`);
-        } else {
-          console.warn(`⚠️ Received answer in unexpected state: ${signalingState}`);
-        }
       }
 
       // Process queued ICE candidates after SDP is set
@@ -857,10 +872,9 @@ async function handleSignalingData(fromSocketId, signal) {
     // Handle ICE candidate
     else if (signal.candidate) {
       const candidateType = signal.candidate.type || 'unknown';
-      const candidateProtocol = signal.candidate.protocol || 'unknown';
       
       if (pc.remoteDescription && pc.remoteDescription.type) {
-        console.log(`📥 Adding ICE candidate from ${peerRecord.nickname}: type=${candidateType}, protocol=${candidateProtocol}`);
+        console.log(`📥 Adding ICE candidate from ${peerRecord.nickname}: type=${candidateType}`);
         try {
           await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
           console.log(`✅ ICE candidate added successfully`);
