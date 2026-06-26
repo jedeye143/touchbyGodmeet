@@ -2,10 +2,34 @@
 
 const iceConfiguration = {
   iceServers: [
+    // Google STUN servers
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
-  ]
+    { urls: 'stun:stun2.l.google.com:19302' },
+    
+    // Free TURN servers for cross-network connections
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    
+    // Additional free STUN servers for better connectivity
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' }
+  ],
+  iceCandidatePoolSize: 10
 };
 
 // Local Media States
@@ -608,16 +632,33 @@ function createPeerConnection(remoteSocketId, nickname, isInitiator, isHost) {
   // Ice candidates gathering callback
   pc.onicecandidate = (event) => {
     if (event.candidate && socket) {
+      console.log(`Sending ICE candidate to ${nickname}:`, event.candidate.type);
       socket.emit('signal', {
         to: remoteSocketId,
         signal: { candidate: event.candidate }
       });
+    } else if (!event.candidate) {
+      console.log(`ICE gathering complete for ${nickname}`);
+    }
+  };
+
+  // ICE connection state monitoring
+  pc.oniceconnectionstatechange = () => {
+    console.log(`ICE connection state for ${nickname}: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === 'failed') {
+      console.error(`ICE connection failed for ${nickname} - trying ICE restart`);
+      // Attempt ICE restart
+      pc.restartIce();
     }
   };
 
   // Connection health changes
   pc.onconnectionstatechange = () => {
     console.log(`Connection state change for ${nickname}: ${pc.connectionState}`);
+    if (pc.connectionState === 'failed') {
+      console.error(`Connection failed for ${nickname} - this might be a firewall/NAT issue`);
+      showNotificationToast(`Connection issue with ${nickname}. They may need to check their network.`);
+    }
     if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
       destroyPeerConnection(remoteSocketId);
       updateParticipantsList();
@@ -700,8 +741,12 @@ async function handleSignalingData(fromSocketId, signal) {
       }
     } else if (signal.candidate) {
       if (pc.remoteDescription && pc.remoteDescription.type) {
-        console.log(`Adding ICE Candidate from: ${peerRecord.nickname}`);
-        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        console.log(`Adding ICE Candidate from: ${peerRecord.nickname} (type: ${signal.candidate.type || 'unknown'})`);
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        } catch (e) {
+          console.error(`Failed to add ICE candidate from ${peerRecord.nickname}:`, e);
+        }
       } else {
         console.log(`Queueing ICE Candidate from: ${peerRecord.nickname} (Remote description not set yet)`);
         peerRecord.iceCandidatesQueue.push(signal.candidate);
