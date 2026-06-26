@@ -4,6 +4,7 @@ let socket = null;
 let roomName = '';
 let myParticipantId = '';
 let isLocalHost = false;
+let roomMode = 'meeting';
 
 // Latency tracking variables
 let lastPingTime = 0;
@@ -78,10 +79,11 @@ function setupSocketEvents() {
   if (!socket) return;
 
   // Server response when local client successfully joins the room
-  socket.on('room-joined', ({ roomId, myId, isHost, participants, isLocked }) => {
-    console.log(`Room joined! ID: ${roomId}, I am host: ${isHost}`);
+  socket.on('room-joined', ({ roomId, myId, isHost, participants, isLocked, roomType, presentation }) => {
+    console.log(`Room joined! ID: ${roomId}, I am host: ${isHost}, mode: ${roomType}`);
     myParticipantId = myId;
     isLocalHost = isHost;
+    roomMode = roomType || 'meeting';
     
     // Update local UI state
     document.getElementById('meeting-id-display').textContent = `Room ID: ${roomId}`;
@@ -99,6 +101,16 @@ function setupSocketEvents() {
     // Set share links in elements
     const inviteLink = `${window.location.origin}/meeting.html?room=${roomId}`;
     document.getElementById('invite-link-input').value = inviteLink;
+
+    // Trigger room mode UI setup
+    if (typeof handleRoomModeSetup === 'function') {
+      handleRoomModeSetup(roomMode);
+    }
+
+    // Trigger ongoing presentation setup
+    if (presentation && typeof handlePresentationStarted === 'function') {
+      handlePresentationStarted(presentation);
+    }
 
     // Trigger local WebRTC connection setup
     handleRoomJoined(participants);
@@ -420,6 +432,72 @@ function setupSocketEvents() {
         networkIcon.classList.add('text-amber-400'); // Moderate
       } else {
         networkIcon.classList.add('text-red-400'); // Poor
+      }
+    }
+  });
+
+  // Bible Verse Broadcasted
+  socket.on('verse-broadcasted', ({ reference, text, translation }) => {
+    if (typeof displayBroadcastedVerse === 'function') {
+      displayBroadcastedVerse({ reference, text, translation });
+    }
+  });
+
+  // Clear Broadcasted Verse
+  socket.on('broadcast-cleared', () => {
+    if (typeof clearBroadcastedVerse === 'function') {
+      clearBroadcastedVerse();
+    }
+  });
+
+  // Presentation Started
+  socket.on('presentation-started', (presData) => {
+    if (typeof handlePresentationStarted === 'function') {
+      handlePresentationStarted(presData);
+    }
+  });
+
+  // Presentation Stopped
+  socket.on('presentation-stopped', () => {
+    if (typeof handlePresentationStopped === 'function') {
+      handlePresentationStopped();
+    }
+  });
+
+  // Whiteboard: real-time draw sync
+  socket.on('draw-whiteboard', (drawData) => {
+    if (typeof handleWhiteboardDraw === 'function') {
+      handleWhiteboardDraw(drawData);
+    }
+  });
+
+  // Whiteboard: clear canvas
+  socket.on('whiteboard-cleared', () => {
+    if (typeof clearWhiteboardCanvas === 'function') {
+      clearWhiteboardCanvas(true); // true = local draw clear
+    }
+  });
+
+  // Screen share drawing toggle (from host)
+  socket.on('screen-drawing-toggled', (data) => {
+    if (typeof window.isDrawingEnabled !== 'undefined') {
+      window.isDrawingEnabled = data.enabled;
+      
+      // Update UI for participants
+      const canvas = document.getElementById('screen-draw-canvas');
+      const drawingTools = document.getElementById('wb-drawing-tools');
+      
+      if (canvas) {
+        canvas.style.cursor = data.enabled ? 'crosshair' : 'default';
+      }
+      
+      // Show/hide tools for participants
+      if (drawingTools && !window.isLocalHost) {
+        if (data.enabled) {
+          drawingTools.classList.remove('hidden');
+        } else {
+          drawingTools.classList.add('hidden');
+        }
       }
     }
   });

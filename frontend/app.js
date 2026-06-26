@@ -278,16 +278,19 @@ function saveNicknameLocally() {
   // Keep nickname in session cache for room loading
   sessionStorage.setItem('aethermeet_temp_nickname', nickname);
   
-  // Save device config preferences
-  sessionStorage.setItem('aethermeet_audio_muted', isAudioMuted);
-  sessionStorage.setItem('aethermeet_video_muted', isVideoMuted);
-  sessionStorage.setItem('aethermeet_blur_bg', isBlurActive);
+  // Save device config preferences to localStorage (persists across browser restarts)
+  localStorage.setItem('aethermeet_audio_muted', isAudioMuted);
+  localStorage.setItem('aethermeet_video_muted', isVideoMuted);
+  localStorage.setItem('aethermeet_blur_bg', isBlurActive);
 
   return true;
 }
 
 function handleCreateMeeting() {
   if (!saveNicknameLocally()) return;
+
+  const roomTypeSelect = document.getElementById('room-type-select');
+  const roomMode = roomTypeSelect ? roomTypeSelect.value : 'meeting';
 
   // Generate 9 character room ID: xxx-xxxx-xxx
   const chars = 'abcdefghijklmnopqrstuvwxyz';
@@ -298,7 +301,7 @@ function handleCreateMeeting() {
   }
 
   // Redirect to call page
-  window.location.href = `meeting.html?room=${randRoom}`;
+  window.location.href = `meeting.html?room=${randRoom}&mode=${roomMode}`;
 }
 
 function handleJoinMeeting() {
@@ -359,7 +362,9 @@ function handleJoinMeeting() {
 
         } else {
           // Room doesn't exist, we will create it and become host
-          window.location.href = `meeting.html?room=${roomVal}`;
+          const roomTypeSelect = document.getElementById('room-type-select');
+          const roomMode = roomTypeSelect ? roomTypeSelect.value : 'meeting';
+          window.location.href = `meeting.html?room=${roomVal}&mode=${roomMode}`;
         }
       } else {
         showToastAlert(response.reason || 'Cannot join this room.');
@@ -414,10 +419,10 @@ function initMeeting() {
     return;
   }
 
-  // Load configured media preferences from lobby
-  isAudioMuted = sessionStorage.getItem('aethermeet_audio_muted') === 'true';
-  isVideoMuted = sessionStorage.getItem('aethermeet_video_muted') === 'true';
-  isBlurActive = sessionStorage.getItem('aethermeet_blur_bg') === 'true';
+  // Load configured media preferences from localStorage (persists across refreshes)
+  isAudioMuted = localStorage.getItem('aethermeet_audio_muted') === 'true';
+  isVideoMuted = localStorage.getItem('aethermeet_video_muted') === 'true';
+  isBlurActive = localStorage.getItem('aethermeet_blur_bg') === 'true';
 
   // Setup history state for back-button minimize/leave hijacking
   history.pushState({ inMeeting: true }, null, location.href);
@@ -530,6 +535,125 @@ function initMeeting() {
   // Setup Hotkeys
   setupKeyboardShortcuts();
 
+  // Bible search button binding
+  const bibleSearchBtn = document.getElementById('bible-search-btn');
+  if (bibleSearchBtn) {
+    bibleSearchBtn.addEventListener('click', searchBibleScripture);
+  }
+
+  // Dismiss broadcast overlay button binding
+  const dismissBroadcastBtn = document.getElementById('dismiss-broadcast-btn');
+  if (dismissBroadcastBtn) {
+    dismissBroadcastBtn.addEventListener('click', clearBibleBroadcast);
+  }
+
+  // Bible toggle sidebar binding
+  const btnToggleBible = document.getElementById('btn-toggle-bible');
+  if (btnToggleBible) {
+    btnToggleBible.addEventListener('click', () => toggleSidebarTab('bible'));
+  }
+  const tabBibleBtn = document.getElementById('tab-bible-btn');
+  if (tabBibleBtn) {
+    tabBibleBtn.addEventListener('click', () => switchSidebarTab('bible'));
+  }
+
+  // Presentation modal opening binding using SweetAlert2
+// REPLACE lines 560-796 in app.js with this code:
+
+  // Presentation modal opening binding using SweetAlert2 - USER FRIENDLY VERSION
+  const btnPresentation = document.getElementById('btn-presentation');
+  if (btnPresentation) {
+    btnPresentation.addEventListener('click', async (e) => {
+      const { value } = await Swal.fire({
+        title: '<div style="font-size:1.5rem; font-weight:900; color:#fff;">🎯 Start Presentation</div>',
+        html: `
+          <p style="font-size:1rem; color:#cbd5e1; margin-bottom:2rem;">Choose how you want to present:</p>
+          <div style="display:grid; gap:1.25rem;">
+            <button id="swal-screen" style="padding:1.5rem; border:3px solid #f59e0b; background:#f59e0b22; border-radius:1rem; cursor:pointer; display:flex; align-items:center; gap:1.25rem; transition:0.2s;" onmouseover="this.style.background='#f59e0b44'" onmouseout="this.style.background='#f59e0b22'">
+              <div style="width:4rem; height:4rem; background:#f59e0b; border-radius:1rem; display:flex; align-items:center; justify-content:center; font-size:2rem;">🖥️</div>
+              <div style="text-align:left;">
+                <h4 style="font-size:1.25rem; font-weight:800; color:#fff; margin:0 0 0.5rem 0;">Share Screen</h4>
+                <p style="font-size:1rem; color:#cbd5e1; margin:0;">Stream your desktop or window</p>
+              </div>
+            </button>
+            <button id="swal-pdf" style="padding:1.5rem; border:3px solid #ef4444; background:#ef444422; border-radius:1rem; cursor:pointer; display:flex; align-items:center; gap:1.25rem; transition:0.2s;" onmouseover="this.style.background='#ef444444'" onmouseout="this.style.background='#ef444422'">
+              <div style="width:4rem; height:4rem; background:#ef4444; border-radius:1rem; display:flex; align-items:center; justify-content:center; font-size:2rem;">📄</div>
+              <div style="text-align:left;">
+                <h4 style="font-size:1.25rem; font-weight:800; color:#fff; margin:0 0 0.5rem 0;">PDF Document</h4>
+                <p style="font-size:1rem; color:#cbd5e1; margin:0;">Display a PDF presentation</p>
+              </div>
+            </button>
+            <button id="swal-whiteboard" style="padding:1.5rem; border:3px solid #10b981; background:#10b98122; border-radius:1rem; cursor:pointer; display:flex; align-items:center; gap:1.25rem; transition:0.2s;" onmouseover="this.style.background='#10b98144'" onmouseout="this.style.background='#10b98122'">
+              <div style="width:4rem; height:4rem; background:#10b981; border-radius:1rem; display:flex; align-items:center; justify-content:center; font-size:2rem;">✏️</div>
+              <div style="text-align:left;">
+                <h4 style="font-size:1.25rem; font-weight:800; color:#fff; margin:0 0 0.5rem 0;">Whiteboard</h4>
+                <p style="font-size:1rem; color:#cbd5e1; margin:0;">Draw on a collaborative canvas</p>
+              </div>
+            </button>
+          </div>
+        `,
+        background: '#1e293b',
+        width: '40rem',
+        padding: '2.5rem',
+        showConfirmButton: false,
+        showCloseButton: true,
+        didOpen: () => {
+          document.getElementById('swal-screen').onclick = async () => {
+            Swal.close();
+            try {
+              if (!isScreenSharing) await toggleScreenShareState();
+              if (socket && isScreenSharing) socket.emit('start-presentation', { type: 'screen' });
+            } catch (err) {
+              Swal.fire({ icon: 'error', title: 'Failed', text: 'Could not start screen share', background: '#1e293b' });
+            }
+          };
+          document.getElementById('swal-pdf').onclick = async () => {
+            const { value: url } = await Swal.fire({
+              title: '📄 Enter PDF URL',
+              input: 'url',
+              inputPlaceholder: 'https://example.com/slides.pdf',
+              background: '#1e293b',
+              showCancelButton: true,
+              confirmButtonText: 'Load',
+              confirmButtonColor: '#f59e0b'
+            });
+            if (url && socket) socket.emit('start-presentation', { type: 'pdf', url });
+          };
+          document.getElementById('swal-whiteboard').onclick = () => {
+            Swal.close();
+            if (socket) socket.emit('start-presentation', { type: 'whiteboard' });
+          };
+        }
+      });
+    });
+  }
+
+
+  // Presentation fullscreen toggle trigger
+  const btnPresFullscreen = document.getElementById('btn-pres-fullscreen');
+  if (btnPresFullscreen) {
+    btnPresFullscreen.addEventListener('click', () => {
+      const viewport = document.getElementById('presentation-viewport');
+      if (viewport) {
+        if (!document.fullscreenElement) {
+          viewport.requestFullscreen().catch(err => {
+            console.error(`Error enabling full-screen presentation mode: ${err.message}`);
+          });
+        } else {
+          document.exitFullscreen();
+        }
+      }
+    });
+  }
+
+  // Presentation Stop trigger
+  const btnStopPres = document.getElementById('btn-stop-pres');
+  if (btnStopPres) {
+    btnStopPres.addEventListener('click', () => {
+      if (socket) socket.emit('stop-presentation');
+    });
+  }
+
   // Initialize socket client
   initSocket(async () => {
     console.log("Socket connected on call screen. Requesting hardware devices...");
@@ -561,7 +685,9 @@ function initMeeting() {
       }
 
       // 3. Emit join-room to server
-      socket.emit('join-room', { roomId, nickname });
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomMode = urlParams.get('mode') || 'meeting';
+      socket.emit('join-room', { roomId, nickname, roomType: roomMode });
 
       // Start meeting clock
       startMeetingTimer();
@@ -575,6 +701,17 @@ function initMeeting() {
 
   // Re-adjust video grid tiles when window is resized
   window.addEventListener('resize', reorganizeGrid);
+
+  // Automatically adjust grid layout when container element sizes change (e.g. sidebar toggle or initial stream load)
+  if (typeof ResizeObserver !== 'undefined') {
+    const gridEl = document.getElementById('video-grid');
+    if (gridEl) {
+      const resizeObserver = new ResizeObserver(() => {
+        reorganizeGrid();
+      });
+      resizeObserver.observe(gridEl);
+    }
+  }
 }
 
 /**
@@ -653,6 +790,9 @@ function toggleCallMic() {
 function muteLocalAudio(mutedState) {
   isAudioMuted = mutedState;
   
+  // Save preference to localStorage so it persists across refreshes
+  localStorage.setItem('aethermeet_audio_muted', isAudioMuted.toString());
+  
   if (localAudioTrack) {
     localAudioTrack.enabled = !isAudioMuted;
   }
@@ -677,6 +817,9 @@ function muteLocalAudio(mutedState) {
  */
 function toggleCallVideo() {
   isVideoMuted = !isVideoMuted;
+  
+  // Save preference to localStorage so it persists across refreshes
+  localStorage.setItem('aethermeet_video_muted', isVideoMuted.toString());
   
   if (localVideoTrack) {
     localVideoTrack.enabled = !isVideoMuted;
@@ -945,7 +1088,7 @@ function renderRemoteVideoTile(remoteSocketId, nickname, stream, isHost) {
   // Build card wrapper HTML structure
   const card = document.createElement('div');
   card.id = `card-${remoteSocketId}`;
-  card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full h-full shadow-lg group max-w-full max-h-full transition-all duration-300 cursor-pointer";
+  card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-auto h-auto shadow-lg group max-w-full max-h-full transition-all duration-300 cursor-pointer justify-self-center self-center";
   
   // Double-click to pin participant video
   card.addEventListener('dblclick', () => pinParticipantVideo(remoteSocketId));
@@ -973,23 +1116,23 @@ function renderRemoteVideoTile(remoteSocketId, nickname, stream, isHost) {
     </div>
 
     <!-- Bottom bar overlay info -->
-    <div class="absolute bottom-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none">
+    <div class="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-3 sm:left-3 sm:right-3 z-30 flex items-center justify-between pointer-events-none">
       <!-- Tag Name -->
-      <div class="bg-slate-950/80 border border-slate-800/80 backdrop-blur-md rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-200 flex items-center space-x-1.5 pointer-events-auto">
+      <div class="bg-slate-950/80 border border-slate-800/80 backdrop-blur-md rounded-lg px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-slate-200 flex items-center space-x-1.5 pointer-events-auto">
         <span>${nickname}</span>
-        ${isHost ? `<span class="bg-brand-500/20 border border-brand-500/30 text-brand-400 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider">Host</span>` : ''}
+        ${isHost ? `<span class="bg-brand-500/20 border border-brand-500/30 text-brand-400 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider ml-1">Host</span>` : ''}
       </div>
       
       <!-- Status Icons -->
       <div class="flex items-center space-x-1.5 pointer-events-auto">
         <!-- Mic -->
-        <div id="mic-status-${remoteSocketId}" class="w-7 h-7 rounded-lg bg-slate-950/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-center text-slate-200">
-          <i data-lucide="mic" class="w-3.5 h-3.5 text-emerald-400"></i>
+        <div id="mic-status-${remoteSocketId}" class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-950/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-center text-slate-200">
+          <i data-lucide="mic" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400"></i>
         </div>
         
         <!-- Screen Sharing -->
-        <div id="screen-status-${remoteSocketId}" class="w-7 h-7 rounded-lg bg-slate-950/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-center text-indigo-400 hidden">
-          <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
+        <div id="screen-status-${remoteSocketId}" class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-950/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-center text-indigo-400 hidden">
+          <i data-lucide="monitor" class="w-3 h-3 sm:w-3.5 sm:h-3.5"></i>
         </div>
       </div>
     </div>
@@ -1040,6 +1183,34 @@ function reorganizeGrid() {
 
   if (totalTiles === 0) return;
 
+  // If a presentation is active, layout video grid as a vertical sidebar of aspect-video tiles
+  if (activePresentation) {
+    destroyPinnedLayoutUI();
+
+    grid.classList.remove('grid', 'flex-row');
+    grid.classList.add('flex', 'flex-col', 'gap-3', 'overflow-y-auto', 'h-full', 'w-full', 'lg:w-1/4', 'shrink-0');
+    grid.style.gridTemplateColumns = '';
+    grid.style.gridTemplateRows = '';
+    grid.style.flexDirection = 'column';
+
+    const cards = grid.querySelectorAll('.relative');
+    cards.forEach(card => {
+      card.style.maxWidth = '100%';
+      card.style.maxHeight = '100%';
+      card.style.width = '100%';
+      card.style.height = '';
+      card.style.aspectRatio = '16/9';
+      
+      // Force smaller layout classes
+      if (card.id === 'local-video-card') {
+        card.className = "relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full shrink-0 shadow-md group transition-all duration-300";
+      } else {
+        card.className = "relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full shrink-0 shadow-md group transition-all duration-300 cursor-pointer";
+      }
+    });
+    return;
+  }
+
   // The spotlight participant can be a manually pinned user, or the active speaker if layout mode is 'spotlight'
   const spotlightId = pinnedParticipantId || (currentLayoutMode === 'spotlight' && totalTiles > 1 && activeSpeakerId ? activeSpeakerId : null);
 
@@ -1051,7 +1222,7 @@ function reorganizeGrid() {
   // Restore defaults from pinned layout styles (destroys tray and resets classes)
   destroyPinnedLayoutUI();
 
-  grid.classList.remove('flex', 'flex-col', 'lg:flex-row');
+  grid.classList.remove('flex', 'flex-col', 'lg:flex-row', 'gap-3', 'overflow-y-auto', 'lg:w-1/4', 'shrink-0');
   grid.classList.add('grid');
   grid.style.flexDirection = '';
 
@@ -1083,11 +1254,28 @@ function reorganizeGrid() {
 
   // Scale height of tiles to fit appropriately within grid height bounds
   const cards = grid.querySelectorAll('.relative');
+  
+  // Calculate dynamic dimensions to fill as much space as possible without overflow
+  const gap = 16; // gap-4 is 16px
+  const availWidth = (containerWidth - (cols - 1) * gap) / cols;
+  const availHeight = (containerHeight - (rows - 1) * gap) / rows;
+  
+  let cardWidth, cardHeight;
+  if (availWidth / availHeight > 16 / 9) {
+    // Limited by height
+    cardHeight = availHeight;
+    cardWidth = cardHeight * (16 / 9);
+  } else {
+    // Limited by width
+    cardWidth = availWidth;
+    cardHeight = cardWidth * (9 / 16);
+  }
+
   cards.forEach(card => {
     card.style.maxWidth = '100%';
     card.style.maxHeight = '100%';
-    card.style.width = '100%';
-    card.style.height = '100%';
+    card.style.width = `${cardWidth}px`;
+    card.style.height = `${cardHeight}px`;
     card.style.aspectRatio = '16/9';
   });
 }
@@ -1198,9 +1386,9 @@ function destroyPinnedLayoutUI() {
         
         // Restore standard grid classes
         if (card.id === 'local-video-card') {
-          card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full h-full shadow-lg group max-w-full max-h-full transition-all duration-300";
+          card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-auto h-auto shadow-lg group max-w-full max-h-full transition-all duration-300 justify-self-center self-center";
         } else {
-          card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full h-full shadow-lg group max-w-full max-h-full transition-all duration-300 cursor-pointer";
+          card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-auto h-auto shadow-lg group max-w-full max-h-full transition-all duration-300 cursor-pointer justify-self-center self-center";
         }
       }
     }
@@ -1210,12 +1398,12 @@ function destroyPinnedLayoutUI() {
   // Also restore classes for the pinned card which remained in the main grid
   const localCard = document.getElementById('local-video-card');
   if (localCard) {
-    localCard.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full h-full shadow-lg group max-w-full max-h-full transition-all duration-300";
+    localCard.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-auto h-auto shadow-lg group max-w-full max-h-full transition-all duration-300 justify-self-center self-center";
   }
   peers.forEach((peer, socketId) => {
     const card = document.getElementById(`card-${socketId}`);
     if (card) {
-      card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-full h-full shadow-lg group max-w-full max-h-full transition-all duration-300 cursor-pointer";
+      card.className = "relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video w-auto h-auto shadow-lg group max-w-full max-h-full transition-all duration-300 cursor-pointer justify-self-center self-center";
     }
   });
 }
@@ -1268,15 +1456,24 @@ function switchSidebarTab(tabName) {
   const chatBtn = document.getElementById('tab-chat-btn');
   const participantsTab = document.getElementById('tab-participants');
   const participantsBtn = document.getElementById('tab-participants-btn');
+  const bibleTab = document.getElementById('tab-bible');
+  const bibleBtn = document.getElementById('tab-bible-btn');
+
+  const activeClass = "flex-grow py-2 text-xs font-semibold rounded-lg bg-slate-900 border border-slate-800 text-white transition-all flex items-center justify-center space-x-1.5";
+  const inactiveClass = "flex-grow py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1.5";
+
+  if (chatTab) chatTab.classList.add('hidden');
+  if (participantsTab) participantsTab.classList.add('hidden');
+  if (bibleTab) bibleTab.classList.add('hidden');
+
+  if (chatBtn) chatBtn.className = inactiveClass;
+  if (participantsBtn) participantsBtn.className = inactiveClass;
+  if (bibleBtn) bibleBtn.className = inactiveClass;
 
   if (tabName === 'chat') {
-    chatTab.classList.remove('hidden');
-    participantsTab.classList.add('hidden');
+    if (chatTab) chatTab.classList.remove('hidden');
+    if (chatBtn) chatBtn.className = activeClass;
     
-    // Buttons styling
-    chatBtn.className = "flex-grow py-2 text-xs font-semibold rounded-lg bg-slate-900 border border-slate-800 text-white transition-all flex items-center justify-center space-x-1.5";
-    participantsBtn.className = "flex-grow py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1.5";
-
     // Clear chat count badge
     unreadMessagesCount = 0;
     const badge = document.getElementById('chat-badge');
@@ -1285,13 +1482,13 @@ function switchSidebarTab(tabName) {
     if (badgeDot) badgeDot.classList.add('hidden');
 
   } else if (tabName === 'participants') {
-    chatTab.classList.add('hidden');
-    participantsTab.classList.remove('hidden');
-
-    chatBtn.className = "flex-grow py-2 text-xs font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1.5";
-    participantsBtn.className = "flex-grow py-2 text-xs font-semibold rounded-lg bg-slate-900 border border-slate-800 text-white transition-all flex items-center justify-center space-x-1.5";
+    if (participantsTab) participantsTab.classList.remove('hidden');
+    if (participantsBtn) participantsBtn.className = activeClass;
 
     updateParticipantsList();
+  } else if (tabName === 'bible') {
+    if (bibleTab) bibleTab.classList.remove('hidden');
+    if (bibleBtn) bibleBtn.className = activeClass;
   }
 }
 
@@ -1823,3 +2020,977 @@ function leaveCallDirectly() {
     window.location.href = 'index.html';
   }
 }
+
+
+/* ==========================================================================
+   CHURCH MODE & PRESENTATION SYSTEM (Whiteboard, Bible API, Broadcasts)
+   ========================================================================== */
+
+let activePresentation = null;
+let whiteboardCanvas = null;
+let whiteboardCtx = null;
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+let wbColor = '#8b5cf6';
+let wbTool = 'pencil';
+let whiteboardHistory = [];
+
+/**
+ * Configure UI based on the selected Room Mode on initial join.
+ */
+function handleRoomModeSetup(roomType) {
+  const badge = document.getElementById('room-mode-badge');
+  if (badge) {
+    badge.classList.remove('hidden');
+    if (roomType === 'church') {
+      badge.textContent = 'Church Mode';
+      badge.className = 'px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-full border bg-amber-500/10 border-amber-500/20 text-amber-400 flex items-center space-x-1 backdrop-blur-md shadow-md';
+      
+      // Show Bible buttons
+      const toggleBible = document.getElementById('btn-toggle-bible');
+      const tabBible = document.getElementById('tab-bible-btn');
+      if (toggleBible) toggleBible.classList.remove('hidden');
+      if (tabBible) tabBible.classList.remove('hidden');
+    } else {
+      badge.textContent = 'Meeting Mode';
+      badge.className = 'px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-full border bg-brand-500/10 border-brand-500/20 text-brand-400 flex items-center space-x-1 backdrop-blur-md shadow-md';
+      
+      // Hide Bible buttons
+      const toggleBible = document.getElementById('btn-toggle-bible');
+      const tabBible = document.getElementById('tab-bible-btn');
+      if (toggleBible) toggleBible.classList.add('hidden');
+      if (tabBible) tabBible.classList.add('hidden');
+    }
+  }
+
+  // Sync presentation button visibility (only for host)
+  const presBtn = document.getElementById('btn-presentation');
+  if (presBtn) {
+    if (isLocalHost) {
+      presBtn.classList.remove('hidden');
+    } else {
+      presBtn.classList.add('hidden');
+    }
+  }
+}
+
+/**
+ * Handle starting of presentation viewports on all clients.
+ */
+function handlePresentationStarted(presData) {
+  activePresentation = presData;
+  console.log("Presentation started globally:", presData);
+
+  // Ensure video-grid is visible (it will be resized to sidebar by reorganizeGrid)
+  const videoGrid = document.getElementById('video-grid');
+  if (videoGrid) {
+    videoGrid.classList.remove('hidden');
+  }
+
+  // Show presentation viewport
+  const viewport = document.getElementById('presentation-viewport');
+  if (viewport) viewport.classList.remove('hidden');
+
+  // Clear previous presentation content
+  const content = document.getElementById('presentation-content');
+  if (content) content.innerHTML = '';
+
+  // Show stop button only if local user is host or the presenter
+  const stopBtn = document.getElementById('btn-stop-pres');
+  if (stopBtn) {
+    if (isLocalHost || presData.presenterId === socket.id) {
+      stopBtn.classList.remove('hidden');
+    } else {
+      stopBtn.classList.add('hidden');
+    }
+  }
+
+  // Toggle whiteboard toolbar controls
+  const wbControls = document.getElementById('whiteboard-controls');
+  if (wbControls) {
+    // Show controls for both whiteboard AND screen share (so you can draw on screen share)
+    if (presData.type === 'whiteboard' || presData.type === 'screen') {
+      wbControls.classList.remove('hidden');
+      wbControls.classList.add('flex');
+      
+      // For screen share, show toggle button (only for host) and hide tools initially
+      if (presData.type === 'screen') {
+        const toggleBtn = document.getElementById('wb-toggle-drawing');
+        const drawingTools = document.getElementById('wb-drawing-tools');
+        
+        if (isLocalHost) {
+          // Host can see the toggle button
+          if (toggleBtn) toggleBtn.classList.remove('hidden');
+        } else {
+          // Participants cannot see toggle button
+          if (toggleBtn) toggleBtn.classList.add('hidden');
+        }
+        
+        // Hide drawing tools initially for screen share
+        if (drawingTools) drawingTools.classList.add('hidden');
+      } else {
+        // For whiteboard, hide toggle and show tools always
+        const toggleBtn = document.getElementById('wb-toggle-drawing');
+        const drawingTools = document.getElementById('wb-drawing-tools');
+        if (toggleBtn) toggleBtn.classList.add('hidden');
+        if (drawingTools) drawingTools.classList.remove('hidden');
+      }
+    } else {
+      wbControls.classList.add('hidden');
+      wbControls.classList.remove('flex');
+    }
+  }
+
+  // Setup specific presentation mode
+  if (presData.type === 'whiteboard') {
+    initWhiteboard();
+    if (socket) {
+      socket.emit('get-whiteboard-history', (history) => {
+        whiteboardHistory = history || [];
+        redrawWhiteboard();
+      });
+    }
+  } else if (presData.type === 'pdf') {
+    if (content) {
+      content.innerHTML = `<iframe src="${presData.url}" class="w-full h-full border-0 bg-slate-900 rounded-xl" allow="fullscreen"></iframe>`;
+    }
+  } else if (presData.type === 'screen') {
+    if (content) {
+      // Create container with video and overlay canvas for drawing
+      content.innerHTML = `
+        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+          <video id="presentation-video" autoplay playsinline class="w-full h-auto object-contain bg-slate-950 rounded-xl" style="position: absolute; max-width: 100%; max-height: 100%;"></video>
+          <canvas id="screen-draw-canvas" class="cursor-crosshair" style="position: absolute; width: 100%; height: 100%; z-index: 10; pointer-events: auto;"></canvas>
+        </div>
+      `;
+      
+      const presVideo = document.getElementById('presentation-video');
+      
+      if (presData.presenterId === socket.id) {
+        if (screenStream) {
+          presVideo.srcObject = screenStream;
+        }
+      } else {
+        const peer = peers.get(presData.presenterId);
+        if (peer && peer.stream) {
+          presVideo.srcObject = peer.stream;
+        }
+      }
+      
+      // Initialize drawing on the overlay canvas
+      initScreenDrawCanvas();
+    }
+  }
+
+  // Re-organize layouts split
+  reorganizeGrid();
+}
+
+/**
+ * Handle stopping presentation viewports on all clients.
+ */
+function handlePresentationStopped() {
+  console.log('Presentation stopped - cleaning up');
+  activePresentation = null;
+
+  // Stop screen stream if we were presenting screen
+  if (isScreenSharing) {
+    stopScreenShare();
+  }
+
+  // Hide presentation viewport
+  const viewport = document.getElementById('presentation-viewport');
+  if (viewport) viewport.classList.add('hidden');
+
+  // Clear presentation content
+  const content = document.getElementById('presentation-content');
+  if (content) content.innerHTML = '';
+
+  // Hide whiteboard controls
+  const wbControls = document.getElementById('whiteboard-controls');
+  if (wbControls) {
+    wbControls.classList.add('hidden');
+    wbControls.classList.remove('flex');
+  }
+
+  // Ensure video-grid is visible
+  const videoGrid = document.getElementById('video-grid');
+  if (videoGrid) {
+    videoGrid.classList.remove('hidden');
+    console.log('Video grid restored to visible');
+  }
+
+  // Re-enable the presentation button for host
+  const presBtn = document.getElementById('btn-presentation');
+  if (presBtn && isLocalHost) {
+    presBtn.disabled = false;
+    presBtn.style.pointerEvents = 'auto';
+    presBtn.style.opacity = '1';
+    presBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+    console.log('Presentation button re-enabled for host');
+  }
+
+  // Reorganize standard grid layouts
+  reorganizeGrid();
+  console.log('Grid reorganized after presentation stop');
+}
+
+/**
+ * Search Bible API using server proxy backend route.
+ */
+async function searchBibleScripture() {
+  const transSelect = document.getElementById('bible-translation');
+  const bookSelect = document.getElementById('bible-book');
+  const chapterInput = document.getElementById('bible-chapter');
+  const verseInput = document.getElementById('bible-verse');
+  const verseEndInput = document.getElementById('bible-verse-end');
+  const resultsDiv = document.getElementById('bible-results');
+
+  if (!transSelect || !bookSelect || !chapterInput || !resultsDiv) return;
+
+  const translation = transSelect.value;
+  const book = bookSelect.value;
+  const chapter = chapterInput.value.trim();
+  const verseStart = verseInput ? verseInput.value.trim() : '';
+  const verseEnd = verseEndInput ? verseEndInput.value.trim() : '';
+
+  if (!chapter) {
+    showNotificationToast("Please enter a chapter number.");
+    return;
+  }
+
+  // Build verse parameter - support ranges like "16-19"
+  let verse = '';
+  if (verseStart && verseEnd && parseInt(verseEnd) > parseInt(verseStart)) {
+    verse = `${verseStart}-${verseEnd}`;
+  } else if (verseStart) {
+    verse = verseStart;
+  }
+
+  resultsDiv.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-8 space-y-2">
+      <div class="w-6 h-6 border-2 border-t-transparent border-amber-500 rounded-full animate-spin"></div>
+      <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Searching Scriptures...</p>
+    </div>
+  `;
+
+  try {
+    // Determine backend URL (same logic as socket connection)
+    const savedBackendUrl = localStorage.getItem('aethermeet_backend_url');
+    let backendUrl = '';
+    
+    if (savedBackendUrl) {
+      backendUrl = savedBackendUrl;
+    } else {
+      const host = window.location.hostname;
+      if (host === 'localhost' || host === '127.0.0.1' || host.includes('192.168.')) {
+        backendUrl = `${window.location.protocol}//${window.location.hostname}:3000`;
+      } else {
+        backendUrl = 'https://touchbygodmeetserver.onrender.com';
+      }
+    }
+    
+    const url = `${backendUrl}/api/bible?translation=${encodeURIComponent(translation)}&book=${encodeURIComponent(book)}&chapter=${encodeURIComponent(chapter)}&verse=${encodeURIComponent(verse)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      resultsDiv.innerHTML = `
+        <div class="p-4 border border-red-500/10 bg-red-500/5 rounded-xl text-center">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400 mx-auto mb-1"></i>
+          <p class="text-xs font-semibold text-red-400">Search Failed</p>
+          <p class="text-[10px] text-slate-500 mt-1">${data.error || 'Check details and try again.'}</p>
+        </div>
+      `;
+      lucide.createIcons();
+      return;
+    }
+
+    // Handle single verse response format
+    if (data.text && data.verse) {
+      const verseRef = `${data.book} ${data.chapter}:${data.verse}`;
+      
+      resultsDiv.innerHTML = '';
+      
+      // Add action buttons for single verse if host
+      if (isLocalHost) {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'flex items-center space-x-2 mb-3 bg-slate-900/60 p-2 border border-slate-850 rounded-xl';
+        actionsDiv.innerHTML = `
+          <span class="text-[9px] font-bold text-slate-400 flex-grow">Search Result</span>
+          <button onclick="shareBibleVerseToChat(\`${data.text.replace(/"/g, '&quot;')}\`, \`${verseRef}\`)" class="px-2 py-1 bg-slate-950 border border-slate-800 hover:border-slate-700 text-[9px] font-semibold rounded-md text-slate-300 hover:text-white flex items-center space-x-1 transition-all">
+            <i data-lucide="message-square" class="w-3 h-3"></i>
+            <span>Share to Chat</span>
+          </button>
+          <button onclick="broadcastBibleVerse(\`${data.text.replace(/"/g, '&quot;')}\`, \`${verseRef}\`, \`${data.translation}\`)" class="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-600/10 text-[9px] font-bold rounded-md flex items-center space-x-1 transition-all shadow-md">
+            <i data-lucide="radio" class="w-3 h-3"></i>
+            <span>Broadcast</span>
+          </button>
+        `;
+        resultsDiv.appendChild(actionsDiv);
+      }
+      
+      const verseDiv = document.createElement('div');
+      verseDiv.className = 'p-3 bg-slate-900/30 border border-slate-850/60 rounded-xl space-y-2';
+      
+      let hostControls = '';
+      if (isLocalHost) {
+        hostControls = `
+          <button onclick="broadcastBibleVerse(\`${data.text.replace(/"/g, '&quot;')}\`, \`${verseRef}\`, \`${data.translation}\`)" class="p-1 hover:bg-amber-500/20 text-amber-400 rounded-md transition-colors" title="Broadcast to screen">
+            <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+      }
+
+      verseDiv.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <span class="text-[10px] font-black text-amber-500 tracking-wider uppercase">${verseRef} (${data.translation})</span>
+          <div class="flex items-center space-x-1 shrink-0">
+            <button onclick="shareBibleVerseToChat(\`${data.text.replace(/"/g, '&quot;')}\`, \`${verseRef}\`)" class="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded-md transition-colors" title="Post to chat">
+              <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+            </button>
+            ${hostControls}
+          </div>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed font-serif">${data.text}</p>
+      `;
+      resultsDiv.appendChild(verseDiv);
+      lucide.createIcons();
+      return;
+    }
+
+    // Handle multiple verses response format
+    if (!data.verses || data.verses.length === 0) {
+      resultsDiv.innerHTML = `
+        <div class="p-4 border border-slate-800 bg-slate-900/30 rounded-xl text-center">
+          <p class="text-xs font-semibold text-slate-300">No results found</p>
+          <p class="text-[10px] text-slate-500 mt-1">Make sure the chapter or verse exists.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Format and render search results
+    resultsDiv.innerHTML = '';
+    
+    // Group all text for full chapter
+    const fullChapterText = data.verses.map(v => `${v.verse} ${v.text}`).join(' ');
+    const reference = `${data.book} ${data.chapter}:${verse || '1-' + data.verses.length}`;
+
+    // Add Broadcast and Share buttons for the whole section if host
+    if (isLocalHost) {
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'flex items-center space-x-2 mb-3 bg-slate-900/60 p-2 border border-slate-850 rounded-xl';
+      actionsDiv.innerHTML = `
+        <span class="text-[9px] font-bold text-slate-400 flex-grow">All Search Results</span>
+        <button onclick="shareBibleVerseToChat(\`${fullChapterText.replace(/"/g, '&quot;')}\`, \`${reference}\`)" class="px-2 py-1 bg-slate-950 border border-slate-800 hover:border-slate-700 text-[9px] font-semibold rounded-md text-slate-300 hover:text-white flex items-center space-x-1 transition-all">
+          <i data-lucide="message-square" class="w-3 h-3"></i>
+          <span>Share to Chat</span>
+        </button>
+        <button onclick="broadcastBibleVerse(\`${fullChapterText.replace(/"/g, '&quot;')}\`, \`${reference}\`, \`${data.translation}\`)" class="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-600/10 text-[9px] font-bold rounded-md flex items-center space-x-1 transition-all shadow-md">
+          <i data-lucide="radio" class="w-3 h-3"></i>
+          <span>Broadcast</span>
+        </button>
+      `;
+      resultsDiv.appendChild(actionsDiv);
+    }
+
+    data.verses.forEach(v => {
+      const verseRef = `${data.book} ${data.chapter}:${v.verse}`;
+      const verseDiv = document.createElement('div');
+      verseDiv.className = 'p-3 bg-slate-900/30 border border-slate-850/60 rounded-xl space-y-2';
+      
+      let hostControls = '';
+      if (isLocalHost) {
+        hostControls = `
+          <button onclick="broadcastBibleVerse(\`${v.text.replace(/"/g, '&quot;')}\`, \`${verseRef}\`, \`${data.translation}\`)" class="p-1 hover:bg-amber-500/20 text-amber-400 rounded-md transition-colors" title="Broadcast to screen">
+            <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+      }
+
+      verseDiv.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <span class="text-[10px] font-black text-amber-500 tracking-wider uppercase">${verseRef} (${data.translation})</span>
+          <div class="flex items-center space-x-1 shrink-0">
+            <button onclick="shareBibleVerseToChat(\`${v.text.replace(/"/g, '&quot;')}\`, \`${verseRef}\`)" class="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded-md transition-colors" title="Post to chat">
+              <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+            </button>
+            ${hostControls}
+          </div>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed font-serif">${v.text}</p>
+      `;
+      resultsDiv.appendChild(verseDiv);
+    });
+
+    lucide.createIcons();
+
+  } catch (err) {
+    console.error("Bible search error:", err);
+    resultsDiv.innerHTML = `
+      <div class="p-4 border border-red-500/10 bg-red-500/5 rounded-xl text-center">
+        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400 mx-auto mb-1"></i>
+        <p class="text-xs font-semibold text-red-400">Search Error</p>
+        <p class="text-[10px] text-slate-500 mt-1">Check console or network and try again.</p>
+      </div>
+    `;
+    lucide.createIcons();
+  }
+}
+
+/**
+ * Post a scripture verse directly to the active meeting room chat.
+ */
+function shareBibleVerseToChat(text, reference) {
+  const message = `📖 **${reference}**\n"${text}"`;
+  if (socket) {
+    socket.emit('send-chat', message);
+    showNotificationToast("Scripture shared in chat!");
+  }
+}
+
+/**
+ * Host only: Broadcasts verse prominently to everyone's screen.
+ */
+function broadcastBibleVerse(text, reference, translation) {
+  if (socket && isLocalHost) {
+    socket.emit('broadcast-verse', { text, reference, translation });
+  }
+}
+
+/**
+ * Host only: Clears current broadcasted overlay for everyone.
+ */
+function clearBibleBroadcast() {
+  if (socket && isLocalHost) {
+    socket.emit('clear-broadcast');
+  }
+}
+
+/**
+ * Display screen-wide broadcast overlay.
+ */
+function displayBroadcastedVerse(data) {
+  const overlay = document.getElementById('broadcast-overlay');
+  const textEl = document.getElementById('broadcast-text');
+  const refEl = document.getElementById('broadcast-reference');
+  const dismissBtn = document.getElementById('dismiss-broadcast-btn');
+
+  if (overlay && textEl && refEl) {
+    textEl.textContent = `“${data.text}”`;
+    refEl.textContent = `${data.reference} (${data.translation})`;
+    
+    overlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+    overlay.classList.add('flex', 'opacity-100');
+
+    // Show host controls
+    if (dismissBtn) {
+      if (isLocalHost) {
+        dismissBtn.classList.remove('hidden');
+      } else {
+        dismissBtn.classList.add('hidden');
+      }
+    }
+    
+    // Reset to expanded state and setup minimize button
+    overlay.setAttribute('data-minimized', 'false');
+    setupBroadcastMinimizeButton();
+  }
+}
+
+/**
+ * Clear broadcast overlay.
+ */
+function clearBroadcastedVerse() {
+  const overlay = document.getElementById('broadcast-overlay');
+  if (overlay) {
+    overlay.classList.add('hidden', 'opacity-0', 'pointer-events-none');
+    overlay.classList.remove('flex', 'opacity-100');
+    
+    // Remove minimize button
+    const minimizeBtn = document.getElementById('minimize-broadcast-btn');
+    if (minimizeBtn) minimizeBtn.remove();
+  }
+}
+
+/**
+ * Setup minimize/restore button for broadcast (all users can use this)
+ */
+function setupBroadcastMinimizeButton() {
+  const overlay = document.getElementById('broadcast-overlay');
+  
+  // Remove old minimize button if exists
+  let minimizeBtn = document.getElementById('minimize-broadcast-btn');
+  if (minimizeBtn) {
+    minimizeBtn.remove();
+  }
+  
+  // Create minimize button
+  minimizeBtn = document.createElement('button');
+  minimizeBtn.id = 'minimize-broadcast-btn';
+  minimizeBtn.className = 'absolute top-2 left-2 text-slate-400 hover:text-slate-200 transition-colors flex items-center space-x-1 bg-slate-800/60 hover:bg-slate-700 border border-slate-700/80 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-wider z-10';
+  minimizeBtn.title = 'Minimize broadcast';
+  minimizeBtn.innerHTML = '<i data-lucide="chevron-down" class="w-3 h-3"></i><span>Hide</span>';
+  
+  minimizeBtn.onclick = () => {
+    const isMinimized = overlay.getAttribute('data-minimized') === 'true';
+    
+    if (isMinimized) {
+      // Restore - show full broadcast
+      overlay.classList.remove('bottom-2');
+      overlay.classList.add('bottom-20');
+      overlay.setAttribute('data-minimized', 'false');
+      minimizeBtn.innerHTML = '<i data-lucide="chevron-down" class="w-3 h-3"></i><span>Hide</span>';
+      minimizeBtn.title = 'Minimize broadcast';
+      
+      // Show content
+      const content = document.getElementById('broadcast-text');
+      const badge = document.getElementById('broadcast-badge');
+      if (content) content.classList.remove('hidden');
+      if (badge) badge.classList.remove('hidden');
+      
+    } else {
+      // Minimize - show only reference bar
+      overlay.classList.remove('bottom-20');
+      overlay.classList.add('bottom-2');
+      overlay.setAttribute('data-minimized', 'true');
+      minimizeBtn.innerHTML = '<i data-lucide="chevron-up" class="w-3 h-3"></i><span>Show</span>';
+      minimizeBtn.title = 'Restore broadcast';
+      
+      // Hide content, show only reference
+      const content = document.getElementById('broadcast-text');
+      const badge = document.getElementById('broadcast-badge');
+      if (content) content.classList.add('hidden');
+      if (badge) badge.classList.add('hidden');
+    }
+    
+    lucide.createIcons();
+  };
+  
+  // Insert into container
+  const container = overlay.querySelector('div > div');
+  if (container) {
+    container.insertBefore(minimizeBtn, container.firstChild);
+  }
+  
+  lucide.createIcons();
+}
+
+
+/* ==========================================================================
+   INTERACTIVE CANVAS WHITEBOARD FUNCTIONS
+   ========================================================================== */
+
+function initWhiteboard() {
+  const container = document.getElementById('presentation-content');
+  if (!container) return;
+
+  container.innerHTML = `<canvas id="whiteboard-canvas" class="w-full h-full bg-[#0d111d] cursor-crosshair rounded-xl shadow-inner"></canvas>`;
+  whiteboardCanvas = document.getElementById('whiteboard-canvas');
+  whiteboardCtx = whiteboardCanvas.getContext('2d');
+
+  resizeWhiteboardCanvas();
+
+  // Mouse Handlers
+  whiteboardCanvas.addEventListener('mousedown', startDrawing);
+  whiteboardCanvas.addEventListener('mousemove', draw);
+  whiteboardCanvas.addEventListener('mouseup', stopDrawing);
+  whiteboardCanvas.addEventListener('mouseout', stopDrawing);
+
+  // Touch Handlers (Mobiles/Tablets)
+  whiteboardCanvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent('mousedown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      whiteboardCanvas.dispatchEvent(mouseEvent);
+    }
+  }, { passive: true });
+
+  whiteboardCanvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent('mousemove', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      whiteboardCanvas.dispatchEvent(mouseEvent);
+    }
+  }, { passive: true });
+
+  whiteboardCanvas.addEventListener('touchend', () => {
+    const mouseEvent = new MouseEvent('mouseup', {});
+    whiteboardCanvas.dispatchEvent(mouseEvent);
+  });
+
+  // Watch resize to prevent drawing clears
+  window.addEventListener('resize', resizeWhiteboardCanvas);
+
+  // Color selection
+  const picker = document.getElementById('wb-color');
+  if (picker) {
+    picker.addEventListener('change', (e) => {
+      wbColor = e.target.value;
+      selectWhiteboardTool('pencil');
+    });
+  }
+
+  // Controls triggers
+  const btnPencil = document.getElementById('wb-tool-pencil');
+  if (btnPencil) btnPencil.onclick = () => selectWhiteboardTool('pencil');
+  
+  const btnEraser = document.getElementById('wb-tool-eraser');
+  if (btnEraser) btnEraser.onclick = () => selectWhiteboardTool('eraser');
+
+  const btnClear = document.getElementById('wb-clear');
+  if (btnClear) {
+    btnClear.onclick = () => {
+      clearWhiteboardCanvas(false);
+    };
+  }
+}
+
+function selectWhiteboardTool(tool) {
+  wbTool = tool;
+  const pBtn = document.getElementById('wb-tool-pencil');
+  const eBtn = document.getElementById('wb-tool-eraser');
+
+  if (!pBtn || !eBtn) return;
+
+  if (tool === 'pencil') {
+    pBtn.className = "w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center transition-all shadow-md";
+    eBtn.className = "w-8 h-8 rounded-lg bg-slate-900 border border-slate-850 text-slate-400 hover:text-white flex items-center justify-center transition-all";
+  } else {
+    eBtn.className = "w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center transition-all shadow-md";
+    pBtn.className = "w-8 h-8 rounded-lg bg-slate-900 border border-slate-850 text-slate-400 hover:text-white flex items-center justify-center transition-all";
+  }
+}
+
+function resizeWhiteboardCanvas() {
+  if (!whiteboardCanvas) return;
+  
+  // Get the actual displayed size of the canvas
+  const rect = whiteboardCanvas.getBoundingClientRect();
+  
+  // Store the current drawing if exists
+  const tempHistory = [...whiteboardHistory];
+  
+  // Set canvas internal dimensions to match displayed dimensions exactly
+  // This ensures 1:1 pixel mapping between mouse coords and canvas coords
+  whiteboardCanvas.width = rect.width;
+  whiteboardCanvas.height = rect.height;
+  
+  // Also set CSS dimensions to match (prevents scaling)
+  whiteboardCanvas.style.width = rect.width + 'px';
+  whiteboardCanvas.style.height = rect.height + 'px';
+
+  // Redraw after resize
+  redrawWhiteboard();
+}
+
+function startDrawing(e) {
+  e.preventDefault();
+  isDrawing = true;
+  const rect = whiteboardCanvas.getBoundingClientRect();
+  
+  // Calculate scale factors in case CSS and canvas dimensions differ
+  const scaleX = whiteboardCanvas.width / rect.width;
+  const scaleY = whiteboardCanvas.height / rect.height;
+  
+  lastX = (e.clientX - rect.left) * scaleX;
+  lastY = (e.clientY - rect.top) * scaleY;
+}
+
+function draw(e) {
+  if (!isDrawing || !whiteboardCanvas) return;
+  e.preventDefault();
+
+  const rect = whiteboardCanvas.getBoundingClientRect();
+  
+  // Calculate scale factors to handle any CSS vs canvas size mismatch
+  const scaleX = whiteboardCanvas.width / rect.width;
+  const scaleY = whiteboardCanvas.height / rect.height;
+  
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top) * scaleY;
+
+  const color = wbTool === 'eraser' ? '#0d111d' : wbColor;
+  const size = wbTool === 'eraser' ? 24 : 3;
+
+  drawSegment(lastX, lastY, x, y, color, size);
+
+  // Sync to socket using relative percentages (guarantees cross-screen consistency)
+  if (socket) {
+    socket.emit('draw-whiteboard', {
+      x0: lastX / whiteboardCanvas.width,
+      y0: lastY / whiteboardCanvas.height,
+      x1: x / whiteboardCanvas.width,
+      y1: y / whiteboardCanvas.height,
+      color,
+      size
+    });
+  }
+
+  lastX = x;
+  lastY = y;
+}
+
+function drawSegment(x0, y0, x1, y1, color, size) {
+  if (!whiteboardCtx) return;
+  whiteboardCtx.beginPath();
+  whiteboardCtx.moveTo(x0, y0);
+  whiteboardCtx.lineTo(x1, y1);
+  whiteboardCtx.strokeStyle = color;
+  whiteboardCtx.lineWidth = size;
+  whiteboardCtx.lineCap = 'round';
+  whiteboardCtx.stroke();
+}
+
+function stopDrawing() {
+  isDrawing = false;
+}
+
+function handleWhiteboardDraw(data) {
+  if (!whiteboardCanvas) return;
+
+  const x0 = data.x0 * whiteboardCanvas.width;
+  const y0 = data.y0 * whiteboardCanvas.height;
+  const x1 = data.x1 * whiteboardCanvas.width;
+  const y1 = data.y1 * whiteboardCanvas.height;
+
+  // Check if this is screen share mode (has screen-draw-canvas)
+  const isScreenDraw = document.getElementById('screen-draw-canvas') === whiteboardCanvas;
+  
+  if (isScreenDraw) {
+    // For screen draw overlay, draw directly on canvas
+    const ctx = whiteboardCtx;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.strokeStyle = data.color;
+    ctx.lineWidth = data.size;
+    ctx.lineCap = 'round';
+    
+    if (data.color === 'rgba(0,0,0,0)') {
+      ctx.globalCompositeOperation = 'destination-out';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    
+    ctx.stroke();
+  } else {
+    // For regular whiteboard, use history-based drawing
+    whiteboardHistory.push(data);
+    drawSegment(x0, y0, x1, y1, data.color, data.size);
+  }
+}
+
+function clearWhiteboardCanvas(isRemote = false) {
+  whiteboardHistory = [];
+  if (whiteboardCtx && whiteboardCanvas) {
+    whiteboardCtx.clearRect(0, 0, whiteboardCanvas.width, whiteboardCanvas.height);
+  }
+  if (!isRemote && socket) {
+    socket.emit('clear-whiteboard');
+  }
+}
+
+function redrawWhiteboard() {
+  if (!whiteboardCanvas || whiteboardHistory.length === 0) return;
+  whiteboardHistory.forEach(data => {
+    const x0 = data.x0 * whiteboardCanvas.width;
+    const y0 = data.y0 * whiteboardCanvas.height;
+    const x1 = data.x1 * whiteboardCanvas.width;
+    const y1 = data.y1 * whiteboardCanvas.height;
+    drawSegment(x0, y0, x1, y1, data.color, data.size);
+  });
+}
+
+/* ==========================================================================
+   SCREEN SHARE DRAWING OVERLAY FUNCTIONS
+   ========================================================================== */
+
+window.isDrawingEnabled = false; // Track if drawing is enabled for screen share (global for socket access)
+
+function initScreenDrawCanvas() {
+  const canvas = document.getElementById('screen-draw-canvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  // Set canvas size to match container
+  const resizeCanvas = () => {
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+  };
+  
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  // Drawing functions for screen overlay
+  const startDraw = (e) => {
+    if (!window.isDrawingEnabled) return; // Only draw if enabled
+    e.preventDefault();
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    lastX = (e.clientX - rect.left) * scaleX;
+    lastY = (e.clientY - rect.top) * scaleY;
+  };
+
+  const draw = (e) => {
+    if (!isDrawing || !window.isDrawingEnabled) return; // Only draw if enabled
+    e.preventDefault();
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    // Use same tool/color as whiteboard
+    const color = wbTool === 'eraser' ? 'rgba(0,0,0,0)' : wbColor;
+    const size = wbTool === 'eraser' ? 24 : 3;
+
+    // Draw on local canvas
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = size;
+    ctx.lineCap = 'round';
+    
+    if (wbTool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    
+    ctx.stroke();
+
+    // Sync to other participants
+    if (socket) {
+      socket.emit('draw-whiteboard', {
+        x0: lastX / canvas.width,
+        y0: lastY / canvas.height,
+        x1: x / canvas.width,
+        y1: y / canvas.height,
+        color,
+        size
+      });
+    }
+
+    lastX = x;
+    lastY = y;
+  };
+
+  const stopDraw = () => {
+    isDrawing = false;
+  };
+
+  // Mouse events
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDraw);
+  canvas.addEventListener('mouseout', stopDraw);
+
+  // Touch events
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1 && window.isDrawingEnabled) {
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent('mousedown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      canvas.dispatchEvent(mouseEvent);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 1 && window.isDrawingEnabled) {
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent('mousemove', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      canvas.dispatchEvent(mouseEvent);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => {
+    if (window.isDrawingEnabled) {
+      const mouseEvent = new MouseEvent('mouseup', {});
+      canvas.dispatchEvent(mouseEvent);
+    }
+  });
+
+  // Clear button functionality for screen draw
+  const btnClear = document.getElementById('wb-clear');
+  if (btnClear) {
+    btnClear.onclick = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (socket) {
+        socket.emit('clear-whiteboard');
+      }
+    };
+  }
+
+  // Toggle drawing button (host only)
+  const toggleBtn = document.getElementById('wb-toggle-drawing');
+  const toggleText = document.getElementById('wb-toggle-text');
+  const drawingTools = document.getElementById('wb-drawing-tools');
+  
+  if (toggleBtn && isLocalHost) {
+    toggleBtn.onclick = () => {
+      window.isDrawingEnabled = !window.isDrawingEnabled;
+      
+      // Update button appearance and text
+      if (window.isDrawingEnabled) {
+        toggleBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500', 'border-emerald-500');
+        toggleBtn.classList.add('bg-red-600', 'hover:bg-red-500', 'border-red-500');
+        if (toggleText) toggleText.textContent = 'Disable Drawing';
+        if (drawingTools) drawingTools.classList.remove('hidden');
+        
+        // Update cursor style
+        canvas.style.cursor = 'crosshair';
+        
+        // Broadcast to participants
+        if (socket) {
+          socket.emit('toggle-screen-drawing', { enabled: true });
+        }
+      } else {
+        toggleBtn.classList.remove('bg-red-600', 'hover:bg-red-500', 'border-red-500');
+        toggleBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500', 'border-emerald-500');
+        if (toggleText) toggleText.textContent = 'Enable Drawing';
+        if (drawingTools) drawingTools.classList.add('hidden');
+        
+        // Update cursor style
+        canvas.style.cursor = 'default';
+        
+        // Broadcast to participants
+        if (socket) {
+          socket.emit('toggle-screen-drawing', { enabled: false });
+        }
+      }
+      
+      lucide.createIcons();
+    };
+  }
+
+  // Store reference for later cleanup
+  whiteboardCanvas = canvas;
+  whiteboardCtx = ctx;
+}
+
