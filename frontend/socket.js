@@ -513,7 +513,7 @@ function startLatencyCheck() {
     if (socket && socket.connected) {
       socket.emit('ping-heartbeat');
     }
-  }, 5000);
+  }, 10000); // Increased from 5s to 10s to reduce network traffic
 }
 
 function stopLatencyCheck() {

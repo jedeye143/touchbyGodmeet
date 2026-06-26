@@ -225,7 +225,7 @@ function setupBlurCanvas() {
  * Optimized to reduce CPU usage and heat generation.
  */
 let lastBlurFrameTime = 0;
-const blurFrameInterval = 1000 / 30; // 30fps instead of 60fps
+const blurFrameInterval = 1000 / 20; // 20fps instead of 30fps (further reduced)
 
 function processBlurFrame(currentTime) {
   if (!isBlurActive || !blurCanvasCtx || !blurSourceVideo || blurSourceVideo.paused || blurSourceVideo.ended) {
@@ -235,7 +235,7 @@ function processBlurFrame(currentTime) {
     return;
   }
 
-  // Throttle to 30fps to reduce CPU usage
+  // Throttle to 20fps to reduce CPU usage (reduced from 30fps)
   if (currentTime - lastBlurFrameTime < blurFrameInterval) {
     blurCanvasLoopId = requestAnimationFrame(processBlurFrame);
     return;
@@ -538,19 +538,20 @@ function setupAudioAnalysis() {
 
 /**
  * Loop running volume frequency checks.
- * Optimized to reduce CPU usage by throttling to 20fps.
+ * Optimized to reduce CPU usage by throttling to 10fps and pausing when muted.
  */
 let lastAudioAnalysisTime = 0;
-const audioAnalysisInterval = 1000 / 20; // 20fps instead of 60fps
+const audioAnalysisInterval = 1000 / 10; // 10fps instead of 20fps
 
 function analyzeLocalAudioVolume(currentTime) {
+  // STOP analysis loop completely when muted to save CPU
   if (!localAnalyser || isAudioMuted) {
     resetMicLevelUI();
-    localAudioLevelLoopId = requestAnimationFrame(analyzeLocalAudioVolume);
+    // DO NOT continue the loop when muted
     return;
   }
 
-  // Throttle to 20fps to reduce CPU usage
+  // Throttle to 10fps to reduce CPU usage
   if (currentTime - lastAudioAnalysisTime < audioAnalysisInterval) {
     localAudioLevelLoopId = requestAnimationFrame(analyzeLocalAudioVolume);
     return;
@@ -784,7 +785,7 @@ function destroyPeerConnection(socketId) {
 
 /**
  * Audio analysis for speaking detection of remote users.
- * Optimized to reduce CPU usage with throttling.
+ * Optimized to reduce CPU usage with throttling and pause when muted.
  */
 function setupRemoteAudioAnalysis(remoteSocketId, remoteStream) {
   try {
@@ -800,15 +801,23 @@ function setupRemoteAudioAnalysis(remoteSocketId, remoteStream) {
     peerRecord.analyser = analyser;
     
     let lastRemoteAnalysisTime = 0;
-    const remoteAnalysisInterval = 1000 / 15; // 15fps for remote audio
+    const remoteAnalysisInterval = 1000 / 10; // 10fps for remote audio (reduced from 15fps)
     
     // Start analysis loop for this peer
     const loop = (currentTime) => {
-      if (!peers.has(remoteSocketId)) return; // Peer was removed
+      const currentPeer = peers.get(remoteSocketId);
+      if (!currentPeer) return; // Peer was removed
+
+      // PAUSE analysis if remote user is muted to save CPU
+      if (currentPeer.remoteAudioMuted) {
+        highlightSpeakingStatus(remoteSocketId, false);
+        currentPeer.analyserLoopId = requestAnimationFrame(loop);
+        return;
+      }
 
       // Throttle remote audio analysis
       if (currentTime - lastRemoteAnalysisTime < remoteAnalysisInterval) {
-        peerRecord.analyserLoopId = requestAnimationFrame(loop);
+        currentPeer.analyserLoopId = requestAnimationFrame(loop);
         return;
       }
       lastRemoteAnalysisTime = currentTime;
@@ -823,13 +832,13 @@ function setupRemoteAudioAnalysis(remoteSocketId, remoteStream) {
       const average = sum / dataArray.length;
 
       // Remote user speaking highlight
-      if (average > speakingThreshold && !peerRecord.remoteAudioMuted) {
+      if (average > speakingThreshold) {
         highlightSpeakingStatus(remoteSocketId, true);
       } else {
         highlightSpeakingStatus(remoteSocketId, false);
       }
 
-      peerRecord.analyserLoopId = requestAnimationFrame(loop);
+      currentPeer.analyserLoopId = requestAnimationFrame(loop);
     };
 
     peerRecord.analyserLoopId = requestAnimationFrame(loop);

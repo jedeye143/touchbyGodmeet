@@ -422,7 +422,15 @@ function initMeeting() {
   // Load configured media preferences from localStorage (persists across refreshes)
   isAudioMuted = localStorage.getItem('aethermeet_audio_muted') === 'true';
   isVideoMuted = localStorage.getItem('aethermeet_video_muted') === 'true';
-  isBlurActive = localStorage.getItem('aethermeet_blur_bg') === 'true';
+  
+  // Check performance mode - if enabled, disable blur
+  const perfModeEnabled = localStorage.getItem('aethermeet_performance_mode') === 'true';
+  if (perfModeEnabled) {
+    isBlurActive = false;
+    localStorage.setItem('aethermeet_blur_bg', 'false');
+  } else {
+    isBlurActive = localStorage.getItem('aethermeet_blur_bg') === 'true';
+  }
 
   // Setup history state for back-button minimize/leave hijacking
   history.pushState({ inMeeting: true }, null, location.href);
@@ -802,6 +810,14 @@ function muteLocalAudio(mutedState) {
   
   if (localAudioTrack) {
     localAudioTrack.enabled = !isAudioMuted;
+  }
+  
+  // Restart or stop audio analysis loop based on mute state (performance optimization)
+  if (!isAudioMuted && localAnalyser) {
+    // Restart audio analysis when unmuting
+    if (!localAudioLevelLoopId) {
+      analyzeLocalAudioVolume();
+    }
   }
   
   // Update local video element indicators
@@ -1729,11 +1745,24 @@ async function openSettingsModal() {
   const micSelect = document.getElementById('call-mic-select');
   const speakerSelect = document.getElementById('call-speaker-select');
   const blurCheck = document.getElementById('call-blur-bg-toggle');
+  const perfModeCheck = document.getElementById('performance-mode-toggle');
 
   if (camSelect) camSelect.innerHTML = '';
   if (micSelect) micSelect.innerHTML = '';
   if (speakerSelect) speakerSelect.innerHTML = '';
   if (blurCheck) blurCheck.checked = isBlurActive;
+  
+  // Load performance mode state
+  const perfModeEnabled = localStorage.getItem('aethermeet_performance_mode') === 'true';
+  if (perfModeCheck) {
+    perfModeCheck.checked = perfModeEnabled;
+  }
+  // Disable blur toggle if performance mode is on
+  if (blurCheck && perfModeEnabled) {
+    blurCheck.disabled = true;
+  } else if (blurCheck) {
+    blurCheck.disabled = false;
+  }
 
   devices.forEach(device => {
     const option = document.createElement('option');
@@ -1772,6 +1801,7 @@ async function applySettingsChanges() {
   const micSelect = document.getElementById('call-mic-select');
   const speakerSelect = document.getElementById('call-speaker-select');
   const blurCheck = document.getElementById('call-blur-bg-toggle');
+  const perfModeCheck = document.getElementById('performance-mode-toggle');
 
   // Check if camera source changed
   if (camSelect && camSelect.value && (!localVideoTrack || localVideoTrack.getSettings().deviceId !== camSelect.value)) {
@@ -1797,8 +1827,34 @@ async function applySettingsChanges() {
     });
   }
 
-  // Blur canvas toggle
-  if (blurCheck && blurCheck.checked !== isBlurActive) {
+  // Performance Mode toggle (overrides blur setting)
+  if (perfModeCheck) {
+    const perfModeEnabled = perfModeCheck.checked;
+    localStorage.setItem('aethermeet_performance_mode', perfModeEnabled.toString());
+    
+    if (perfModeEnabled) {
+      // Disable blur if performance mode is on
+      if (isBlurActive) {
+        toggleBackgroundBlur(false);
+      }
+      // Disable blur toggle when performance mode is on
+      if (blurCheck) {
+        blurCheck.checked = false;
+        blurCheck.disabled = true;
+      }
+      showNotificationToast("⚡ Performance Mode enabled - blur disabled, frame rates reduced");
+    } else {
+      // Re-enable blur toggle
+      if (blurCheck) {
+        blurCheck.disabled = false;
+      }
+      showNotificationToast("Performance Mode disabled - normal operation restored");
+    }
+  }
+
+  // Blur canvas toggle (only if performance mode is off)
+  const perfModeEnabled = localStorage.getItem('aethermeet_performance_mode') === 'true';
+  if (blurCheck && blurCheck.checked !== isBlurActive && !perfModeEnabled) {
     toggleBackgroundBlur(blurCheck.checked);
   }
 
