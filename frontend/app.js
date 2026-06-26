@@ -782,8 +782,10 @@ function handleRoomJoined(existingParticipants) {
   
   // Set up peer connections
   existingParticipants.forEach(participant => {
-    // We are the initiator (joining later), so we create the connection and offer
-    createPeerConnection(participant.socketId, participant.nickname, true, participant.isHost);
+    // WE are the NEW joiner, so we do NOT initiate (isInitiator=FALSE)
+    // Existing participants will receive 'user-connected' and initiate to us
+    console.log(`Creating peer connection to existing participant: ${participant.nickname} (they will initiate)`);
+    createPeerConnection(participant.socketId, participant.nickname, false, participant.isHost);
   });
 
   updateParticipantsList();
